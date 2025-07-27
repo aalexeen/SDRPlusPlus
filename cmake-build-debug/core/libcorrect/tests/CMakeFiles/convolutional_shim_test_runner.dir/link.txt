@@ -1,0 +1,1 @@
+/usr/bin/cc  -fPIC -std=c99 -Wall -Wpedantic -g3 -O0 -fsanitize=address -msse4.1 -g  -Wl,-no_pie, -rdynamic "CMakeFiles/convolutional_shim_test_runner.dir/convolutional-shim.c.o" "../util/CMakeFiles/error_sim_shim.dir/error-sim.c.o" "../util/CMakeFiles/error_sim_shim.dir/error-sim-shim.c.o" -o ../../../tests/convolutional_shim_test_runner  ../lib/libcorrect.a ../lib/libfec.a -lm 

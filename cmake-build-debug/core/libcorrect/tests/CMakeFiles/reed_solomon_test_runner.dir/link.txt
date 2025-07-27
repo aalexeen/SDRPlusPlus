@@ -1,0 +1,1 @@
+/usr/bin/cc  -fPIC -std=c99 -Wall -Wpedantic -g3 -O0 -fsanitize=address -msse4.1 -g  -Wl,-no_pie, -rdynamic "CMakeFiles/reed_solomon_test_runner.dir/reed-solomon.c.o" CMakeFiles/reed_solomon_test_runner.dir/rs_tester.c.o -o ../../../tests/reed_solomon_test_runner  ../lib/libcorrect.a -lm 

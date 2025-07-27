@@ -5,13 +5,15 @@
 #include <gui/widgets/symbol_diagram.h>
 #include <gui/style.h>
 #include <dsp/sink/handler_sink.h>
+#include "dsp.h"
 #include "flex.h"
 
+#define BAUDRATE    1600
+#define SAMPLERATE  (BAUDRATE*10)
+
 class FLEXDecoder : public Decoder {
-    dsp::stream<float> dummy1;
-    dsp::stream<uint8_t> dummy2;
 public:
-    FLEXDecoder(const std::string& name, VFOManager::VFO* vfo) : diag(0.6, 1600) {
+    FLEXDecoder(const std::string& name, VFOManager::VFO* vfo) : diag(0.6, BAUDRATE) {
         this->name = name;
         this->vfo = vfo;
 
@@ -22,10 +24,14 @@ public:
 
         // Init DSP
         vfo->setBandwidthLimits(12500, 12500, true);
-        vfo->setSampleRate(16000, 12500);
-        reshape.init(&dummy1, 1600.0, (1600 / 30.0) - 1600.0);
-        dataHandler.init(&dummy2, _dataHandler, this);
+        vfo->setSampleRate(SAMPLERATE, 12500);
+        dsp.init(vfo->output, SAMPLERATE, BAUDRATE);
+        reshape.init(&dsp.soft, BAUDRATE, (BAUDRATE / 30.0) - BAUDRATE);
+        dataHandler.init(&dsp.out, _dataHandler, this);
         diagHandler.init(&reshape.out, _diagHandler, this);
+
+        // Init decoder
+        decoder.onMessage.bind(&FLEXDecoder::messageHandler, this);
     }
 
     ~FLEXDecoder() {
@@ -36,7 +42,7 @@ public:
         ImGui::LeftLabel("Baudrate");
         ImGui::FillWidth();
         if (ImGui::Combo(("##pager_decoder_flex_br_" + name).c_str(), &brId, baudrates.txt)) {
-            // TODO
+            // TODO: Implement baudrate change
         }
 
         ImGui::FillWidth();
@@ -46,21 +52,19 @@ public:
     void setVFO(VFOManager::VFO* vfo) {
         this->vfo = vfo;
         vfo->setBandwidthLimits(12500, 12500, true);
-        vfo->setSampleRate(24000, 12500);
-        // dsp.setInput(vfo->output);
+        vfo->setSampleRate(SAMPLERATE, 12500);
+        dsp.setInput(vfo->output);
     }
 
     void start() {
-        flog::debug("FLEX start");
-        // dsp.start();
+        dsp.start();
         reshape.start();
         dataHandler.start();
         diagHandler.start();
     }
 
     void stop() {
-        flog::debug("FLEX stop");
-        // dsp.stop();
+        dsp.stop();
         reshape.stop();
         dataHandler.stop();
         diagHandler.stop();
@@ -69,7 +73,7 @@ public:
 private:
     static void _dataHandler(uint8_t* data, int count, void* ctx) {
         FLEXDecoder* _this = (FLEXDecoder*)ctx;
-        // _this->decoder.process(data, count);
+        _this->decoder.process(data, count);
     }
 
     static void _diagHandler(float* data, int count, void* ctx) {
@@ -79,9 +83,22 @@ private:
         _this->diag.releaseBuffer();
     }
 
-    std::string name;
+    void messageHandler(flex::Address addr, flex::MessageType type, const std::string& msg) {
+        const char* typeStr = "UNK";
+        switch (type) {
+            case flex::MESSAGE_TYPE_ALPHANUMERIC: typeStr = "ALN"; break;
+            case flex::MESSAGE_TYPE_STANDARD_NUMERIC: typeStr = "NUM"; break;
+            case flex::MESSAGE_TYPE_TONE: typeStr = "TON"; break;
+            case flex::MESSAGE_TYPE_BINARY: typeStr = "BIN"; break;
+            default: break;
+        }
+        flog::debug("FLEX [{}] {}: '{}'", (uint64_t)addr, typeStr, msg);
+    }
 
+    std::string name;
     VFOManager::VFO* vfo;
+
+    FLEXDSP dsp;
     dsp::buffer::Reshaper<float> reshape;
     dsp::sink::Handler<uint8_t> dataHandler;
     dsp::sink::Handler<float> diagHandler;

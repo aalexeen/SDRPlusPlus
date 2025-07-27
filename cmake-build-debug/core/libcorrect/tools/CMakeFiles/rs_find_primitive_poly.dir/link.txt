@@ -1,0 +1,1 @@
+/usr/bin/cc  -fPIC -std=c99 -Wall -Wpedantic -g3 -O0 -fsanitize=address -msse4.1 -g  -Wl,-no_pie, -rdynamic CMakeFiles/rs_find_primitive_poly.dir/find_rs_primitive_poly.c.o -o ../bin/rs_find_primitive_poly  ../lib/libcorrect.a 
