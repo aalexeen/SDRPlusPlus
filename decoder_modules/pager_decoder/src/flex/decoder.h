@@ -6,6 +6,7 @@
 #include <gui/style.h>
 #include <dsp/sink/handler_sink.h>
 #include "flex.h"
+#include "dsp.h"
 
 class FLEXDecoder : public Decoder {
     dsp::stream<float> dummy1;

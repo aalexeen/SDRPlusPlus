@@ -340,7 +340,8 @@ endif (OPT_BUILD_SCHEDULER)
 if (MSVC)
     add_executable(sdrpp "src/main.cpp" "win32/resources.rc")
 else ()
-    add_executable(sdrpp "src/main.cpp")
+    add_executable(sdrpp "src/main.cpp"
+            decoder_modules/pager_decoder/src/flex/dsp.h)
 endif ()
 
 target_link_libraries(sdrpp PRIVATE sdrpp_core)
