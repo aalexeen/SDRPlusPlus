@@ -57,6 +57,9 @@ option(OPT_BUILD_RYFI_DECODER "RyFi data link decoder" OFF)
 option(OPT_BUILD_VOR_RECEIVER "VOR beacon receiver" OFF)
 option(OPT_BUILD_WEATHER_SAT_DECODER "Build the HRPT decoder module (no dependencies required)" OFF)
 
+# BCH Error Correction Options (for FLEX/Pager decoder)
+option(OPT_USE_FULL_BCH "Use full BCH error correction for FLEX (license restricted)" ON)
+
 # Misc
 option(OPT_BUILD_DISCORD_PRESENCE "Build the Discord Rich Presence module" ON)
 option(OPT_BUILD_FREQUENCY_MANAGER "Build the Frequency Manager module" ON)
@@ -71,6 +74,23 @@ option(OPT_BUILD_SCHEDULER "Build the scheduler" OFF)
 option(USE_INTERNAL_LIBCORRECT "Use an internal version of libcorrect" ON)
 option(USE_BUNDLE_DEFAULTS "Set the default resource and module directories to the right ones for a MacOS .app" OFF)
 option(COPY_MSVC_REDISTRIBUTABLES "Copy over the Visual C++ Redistributable" OFF)
+
+# BCH Implementation Configuration
+if(OPT_BUILD_PAGER_DECODER)
+    if(OPT_USE_FULL_BCH)
+        message(STATUS "FLEX decoder: Using full BCH error correction (license restricted for commercial use)")
+        set(FLEX_BCH_SOURCE "BCHCode.cpp")
+        set(FLEX_USE_FULL_BCH 1)
+    else()
+        message(STATUS "FLEX decoder: Using BCH stub (GPL-compatible, no error correction)")
+        set(FLEX_BCH_SOURCE "BCHCode_stub.cpp")
+        set(FLEX_USE_FULL_BCH 0)
+    endif()
+
+    # Make BCH configuration available to subdirectories
+    set(FLEX_BCH_SOURCE ${FLEX_BCH_SOURCE} CACHE INTERNAL "BCH source file for FLEX decoder")
+    set(FLEX_USE_FULL_BCH ${FLEX_USE_FULL_BCH} CACHE INTERNAL "Whether to use full BCH implementation")
+endif()
 
 # Module cmake path
 set(SDRPP_MODULE_CMAKE "${CMAKE_SOURCE_DIR}/sdrpp_module.cmake")
@@ -112,7 +132,7 @@ endif()
 # Configure toolchain for android
 if (ANDROID)
     set(CMAKE_SHARED_LINKER_FLAGS
-        "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate"
+            "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate"
     )
     set(CMAKE_C_STANDARD 11)
     set(CMAKE_CXX_STANDARD 14)
@@ -124,217 +144,217 @@ add_subdirectory("core")
 
 # Source modules
 if (OPT_BUILD_AIRSPY_SOURCE)
-add_subdirectory("source_modules/airspy_source")
+    add_subdirectory("source_modules/airspy_source")
 endif (OPT_BUILD_AIRSPY_SOURCE)
 
 if (OPT_BUILD_AIRSPYHF_SOURCE)
-add_subdirectory("source_modules/airspyhf_source")
+    add_subdirectory("source_modules/airspyhf_source")
 endif (OPT_BUILD_AIRSPYHF_SOURCE)
 
 if (OPT_BUILD_AUDIO_SOURCE)
-add_subdirectory("source_modules/audio_source")
+    add_subdirectory("source_modules/audio_source")
 endif (OPT_BUILD_AUDIO_SOURCE)
 
 if (OPT_BUILD_BADGESDR_SOURCE)
-add_subdirectory("source_modules/badgesdr_source")
+    add_subdirectory("source_modules/badgesdr_source")
 endif (OPT_BUILD_BADGESDR_SOURCE)
 
 if (OPT_BUILD_BLADERF_SOURCE)
-add_subdirectory("source_modules/bladerf_source")
+    add_subdirectory("source_modules/bladerf_source")
 endif (OPT_BUILD_BLADERF_SOURCE)
 
 if (OPT_BUILD_FILE_SOURCE)
-add_subdirectory("source_modules/file_source")
+    add_subdirectory("source_modules/file_source")
 endif (OPT_BUILD_FILE_SOURCE)
 
 if (OPT_BUILD_FOBOSSDR_SOURCE)
-add_subdirectory("source_modules/fobossdr_source")
+    add_subdirectory("source_modules/fobossdr_source")
 endif (OPT_BUILD_FOBOSSDR_SOURCE)
 
 if (OPT_BUILD_HACKRF_SOURCE)
-add_subdirectory("source_modules/hackrf_source")
+    add_subdirectory("source_modules/hackrf_source")
 endif (OPT_BUILD_HACKRF_SOURCE)
 
 if (OPT_BUILD_HAROGIC_SOURCE)
-add_subdirectory("source_modules/harogic_source")
+    add_subdirectory("source_modules/harogic_source")
 endif (OPT_BUILD_HAROGIC_SOURCE)
 
 if (OPT_BUILD_HERMES_SOURCE)
-add_subdirectory("source_modules/hermes_source")
+    add_subdirectory("source_modules/hermes_source")
 endif (OPT_BUILD_HERMES_SOURCE)
 
 if (OPT_BUILD_HYDRASDR_SOURCE)
-add_subdirectory("source_modules/hydrasdr_source")
+    add_subdirectory("source_modules/hydrasdr_source")
 endif (OPT_BUILD_HYDRASDR_SOURCE)
 
 if (OPT_BUILD_KCSDR_SOURCE)
-add_subdirectory("source_modules/kcsdr_source")
+    add_subdirectory("source_modules/kcsdr_source")
 endif (OPT_BUILD_KCSDR_SOURCE)
 
 if (OPT_BUILD_LIMESDR_SOURCE)
-add_subdirectory("source_modules/limesdr_source")
+    add_subdirectory("source_modules/limesdr_source")
 endif (OPT_BUILD_LIMESDR_SOURCE)
 
 if (OPT_BUILD_NETWORK_SOURCE)
-add_subdirectory("source_modules/network_source")
+    add_subdirectory("source_modules/network_source")
 endif (OPT_BUILD_NETWORK_SOURCE)
 
 if (OPT_BUILD_PERSEUS_SOURCE)
-add_subdirectory("source_modules/perseus_source")
+    add_subdirectory("source_modules/perseus_source")
 endif (OPT_BUILD_PERSEUS_SOURCE)
 
 if (OPT_BUILD_PLUTOSDR_SOURCE)
-add_subdirectory("source_modules/plutosdr_source")
+    add_subdirectory("source_modules/plutosdr_source")
 endif (OPT_BUILD_PLUTOSDR_SOURCE)
 
 if (OPT_BUILD_RFNM_SOURCE)
-add_subdirectory("source_modules/rfnm_source")
+    add_subdirectory("source_modules/rfnm_source")
 endif (OPT_BUILD_RFNM_SOURCE)
 
 if (OPT_BUILD_RFSPACE_SOURCE)
-add_subdirectory("source_modules/rfspace_source")
+    add_subdirectory("source_modules/rfspace_source")
 endif (OPT_BUILD_RFSPACE_SOURCE)
 
 if (OPT_BUILD_RTL_SDR_SOURCE)
-add_subdirectory("source_modules/rtl_sdr_source")
+    add_subdirectory("source_modules/rtl_sdr_source")
 endif (OPT_BUILD_RTL_SDR_SOURCE)
 
 if (OPT_BUILD_RTL_TCP_SOURCE)
-add_subdirectory("source_modules/rtl_tcp_source")
+    add_subdirectory("source_modules/rtl_tcp_source")
 endif (OPT_BUILD_RTL_TCP_SOURCE)
 
 if (OPT_BUILD_SDDC_SOURCE)
-add_subdirectory("source_modules/sddc_source")
+    add_subdirectory("source_modules/sddc_source")
 endif (OPT_BUILD_SDDC_SOURCE)
 
 if (OPT_BUILD_SDRPP_SERVER_SOURCE)
-add_subdirectory("source_modules/sdrpp_server_source")
+    add_subdirectory("source_modules/sdrpp_server_source")
 endif (OPT_BUILD_SDRPP_SERVER_SOURCE)
 
 if (OPT_BUILD_SDRPLAY_SOURCE)
-add_subdirectory("source_modules/sdrplay_source")
+    add_subdirectory("source_modules/sdrplay_source")
 endif (OPT_BUILD_SDRPLAY_SOURCE)
 
 if (OPT_BUILD_SOAPY_SOURCE)
-add_subdirectory("source_modules/soapy_source")
+    add_subdirectory("source_modules/soapy_source")
 endif (OPT_BUILD_SOAPY_SOURCE)
 
 if (OPT_BUILD_SPECTRAN_SOURCE)
-add_subdirectory("source_modules/spectran_source")
+    add_subdirectory("source_modules/spectran_source")
 endif (OPT_BUILD_SPECTRAN_SOURCE)
 
 if (OPT_BUILD_SPECTRAN_HTTP_SOURCE)
-add_subdirectory("source_modules/spectran_http_source")
+    add_subdirectory("source_modules/spectran_http_source")
 endif (OPT_BUILD_SPECTRAN_HTTP_SOURCE)
 
 if (OPT_BUILD_SPYSERVER_SOURCE)
-add_subdirectory("source_modules/spyserver_source")
+    add_subdirectory("source_modules/spyserver_source")
 endif (OPT_BUILD_SPYSERVER_SOURCE)
 
 if (OPT_BUILD_USRP_SOURCE)
-add_subdirectory("source_modules/usrp_source")
+    add_subdirectory("source_modules/usrp_source")
 endif (OPT_BUILD_USRP_SOURCE)
 
 
 # Sink modules
 if (OPT_BUILD_ANDROID_AUDIO_SINK)
-add_subdirectory("sink_modules/android_audio_sink")
+    add_subdirectory("sink_modules/android_audio_sink")
 endif (OPT_BUILD_ANDROID_AUDIO_SINK)
 
 if (OPT_BUILD_AUDIO_SINK)
-add_subdirectory("sink_modules/audio_sink")
+    add_subdirectory("sink_modules/audio_sink")
 endif (OPT_BUILD_AUDIO_SINK)
 
 if (OPT_BUILD_PORTAUDIO_SINK)
-add_subdirectory("sink_modules/portaudio_sink")
+    add_subdirectory("sink_modules/portaudio_sink")
 endif (OPT_BUILD_PORTAUDIO_SINK)
 
 if (OPT_BUILD_NETWORK_SINK)
-add_subdirectory("sink_modules/network_sink")
+    add_subdirectory("sink_modules/network_sink")
 endif (OPT_BUILD_NETWORK_SINK)
 
 if (OPT_BUILD_NEW_PORTAUDIO_SINK)
-add_subdirectory("sink_modules/new_portaudio_sink")
+    add_subdirectory("sink_modules/new_portaudio_sink")
 endif (OPT_BUILD_NEW_PORTAUDIO_SINK)
 
 
 # Decoders
 if (OPT_BUILD_ATV_DECODER)
-add_subdirectory("decoder_modules/atv_decoder")
+    add_subdirectory("decoder_modules/atv_decoder")
 endif (OPT_BUILD_ATV_DECODER)
 
 if (OPT_BUILD_DAB_DECODER)
-add_subdirectory("decoder_modules/dab_decoder")
+    add_subdirectory("decoder_modules/dab_decoder")
 endif (OPT_BUILD_DAB_DECODER)
 
 if (OPT_BUILD_FALCON9_DECODER)
-add_subdirectory("decoder_modules/falcon9_decoder")
+    add_subdirectory("decoder_modules/falcon9_decoder")
 endif (OPT_BUILD_FALCON9_DECODER)
 
 if (OPT_BUILD_KG_SSTV_DECODER)
-add_subdirectory("decoder_modules/kg_sstv_decoder")
+    add_subdirectory("decoder_modules/kg_sstv_decoder")
 endif (OPT_BUILD_KG_SSTV_DECODER)
 
 if (OPT_BUILD_M17_DECODER)
-add_subdirectory("decoder_modules/m17_decoder")
+    add_subdirectory("decoder_modules/m17_decoder")
 endif (OPT_BUILD_M17_DECODER)
 
 if (OPT_BUILD_METEOR_DEMODULATOR)
-add_subdirectory("decoder_modules/meteor_demodulator")
+    add_subdirectory("decoder_modules/meteor_demodulator")
 endif (OPT_BUILD_METEOR_DEMODULATOR)
 
 if (OPT_BUILD_PAGER_DECODER)
-add_subdirectory("decoder_modules/pager_decoder")
+    add_subdirectory("decoder_modules/pager_decoder")
 endif (OPT_BUILD_PAGER_DECODER)
 
 if (OPT_BUILD_RADIO)
-add_subdirectory("decoder_modules/radio")
+    add_subdirectory("decoder_modules/radio")
 endif (OPT_BUILD_RADIO)
 
 if (OPT_BUILD_RYFI_DECODER)
-add_subdirectory("decoder_modules/ryfi_decoder")
+    add_subdirectory("decoder_modules/ryfi_decoder")
 endif (OPT_BUILD_RYFI_DECODER)
 
 if (OPT_BUILD_VOR_RECEIVER)
-add_subdirectory("decoder_modules/vor_receiver")
+    add_subdirectory("decoder_modules/vor_receiver")
 endif (OPT_BUILD_VOR_RECEIVER)
 
 if (OPT_BUILD_WEATHER_SAT_DECODER)
-add_subdirectory("decoder_modules/weather_sat_decoder")
+    add_subdirectory("decoder_modules/weather_sat_decoder")
 endif (OPT_BUILD_WEATHER_SAT_DECODER)
 
 
 # Misc
 if (OPT_BUILD_DISCORD_PRESENCE)
-add_subdirectory("misc_modules/discord_integration")
+    add_subdirectory("misc_modules/discord_integration")
 endif (OPT_BUILD_DISCORD_PRESENCE)
 
 if (OPT_BUILD_FREQUENCY_MANAGER)
-add_subdirectory("misc_modules/frequency_manager")
+    add_subdirectory("misc_modules/frequency_manager")
 endif (OPT_BUILD_FREQUENCY_MANAGER)
 
 if (OPT_BUILD_IQ_EXPORTER)
-add_subdirectory("misc_modules/iq_exporter")
+    add_subdirectory("misc_modules/iq_exporter")
 endif (OPT_BUILD_IQ_EXPORTER)
 
 if (OPT_BUILD_RECORDER)
-add_subdirectory("misc_modules/recorder")
+    add_subdirectory("misc_modules/recorder")
 endif (OPT_BUILD_RECORDER)
 
 if (OPT_BUILD_RIGCTL_CLIENT)
-add_subdirectory("misc_modules/rigctl_client")
+    add_subdirectory("misc_modules/rigctl_client")
 endif (OPT_BUILD_RIGCTL_CLIENT)
 
 if (OPT_BUILD_RIGCTL_SERVER)
-add_subdirectory("misc_modules/rigctl_server")
+    add_subdirectory("misc_modules/rigctl_server")
 endif (OPT_BUILD_RIGCTL_SERVER)
 
 if (OPT_BUILD_SCANNER)
-add_subdirectory("misc_modules/scanner")
+    add_subdirectory("misc_modules/scanner")
 endif (OPT_BUILD_SCANNER)
 
 if (OPT_BUILD_SCHEDULER)
-add_subdirectory("misc_modules/scheduler")
+    add_subdirectory("misc_modules/scheduler")
 endif (OPT_BUILD_SCHEDULER)
 
 if (MSVC)
@@ -364,7 +384,7 @@ if (MSVC)
         foreach(DLL IN LISTS CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
             set(REDIST_DLLS_STR COMMAND xcopy /F \"${DLL}\" \"$<TARGET_FILE_DIR:sdrpp>\" /Y ${REDIST_DLLS_STR})
         endforeach()
-        
+
         # Create target
         add_custom_target(do_always_msvc ALL ${REDIST_DLLS_STR})
     endif ()
