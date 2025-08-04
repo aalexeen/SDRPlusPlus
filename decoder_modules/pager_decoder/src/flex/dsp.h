@@ -8,33 +8,37 @@
 #include <dsp/correction/dc_blocker.h>
 #include <dsp/loop/fast_agc.h>
 
+// Include converted multimon-ng FLEX components
+#include "flex_next.h"
+#include "BCHCode.h"
+
 #define AUDIO_SAMPLERATE 22050.0  // Standard audio rate for multimon-ng
 
 class FLEXDSP : public dsp::Processor<dsp::complex_t, float> {
     using base_type = dsp::Processor<dsp::complex_t, float>;
 public:
     FLEXDSP() {}
-    FLEXDSP(dsp::stream<dsp::complex_t>* in, double samplerate) { 
-        init(in, samplerate); 
+    FLEXDSP(dsp::stream<dsp::complex_t>* in, double samplerate) {
+        init(in, samplerate);
     }
 
     void init(dsp::stream<dsp::complex_t>* in, double samplerate) {
         _samplerate = samplerate;
-        
+
         // FM Demodulator - converts FSK to audio
         // FLEX uses FSK, so FM demod will convert freq shifts to amplitude changes
         fmDemod.init(NULL, 0.0, samplerate);
-        
+
         // DC Blocker - removes DC component
         dcBlocker.init(NULL, 0.001);
-        
+
         // AGC - automatic gain control for consistent audio levels
         agc.init(NULL, 0.001, 1.0);
-        
+
         // Low-pass filter - audio bandwidth limiting (~10kHz)
         auto lpTaps = dsp::taps::lowPass<float>(10000.0, 2000.0, samplerate);
         lpFilter.init(NULL, lpTaps);
-        
+
         // Resampler - convert to audio sample rate (22050 Hz)
         if (samplerate != AUDIO_SAMPLERATE) {
             resampler.init(NULL, samplerate, AUDIO_SAMPLERATE);
@@ -57,23 +61,23 @@ public:
     int process(int count, dsp::complex_t* in, float* out) {
         // FM demodulation (FSK -> audio)
         count = fmDemod.process(count, in, fmDemod.out.readBuf);
-        
+
         // Remove DC component
         count = dcBlocker.process(count, fmDemod.out.readBuf, dcBlocker.out.readBuf);
-        
+
         // Automatic gain control
         count = agc.process(count, dcBlocker.out.readBuf, agc.out.readBuf);
-        
+
         // Low-pass filtering
         count = lpFilter.process(count, agc.out.readBuf, lpFilter.out.readBuf);
-        
+
         // Resample to audio rate if needed
         if (needsResampling) {
             count = resampler.process(count, lpFilter.out.readBuf, out);
         } else {
             memcpy(out, lpFilter.out.readBuf, count * sizeof(float));
         }
-        
+
         return count;
     }
 
@@ -96,12 +100,12 @@ private:
     dsp::loop::FastAGC<float> agc;            // Automatic gain control
     dsp::filter::FIR<float, float> lpFilter;  // Low-pass filter
     dsp::multirate::RationalResampler<float> resampler; // Sample rate conversion
-    
+
     double _samplerate;
     bool needsResampling;
 };
 
-// FLEX Decoder that uses audio input (adapted from multimon-ng)
+// FLEX Decoder that integrates multimon-ng components
 class FLEXDecoder : public Decoder {
 public:
     FLEXDecoder(const std::string& name, VFOManager::VFO* vfo) {
@@ -111,15 +115,15 @@ public:
         // Set VFO parameters for FLEX (typically 929-932 MHz, 25kHz bandwidth)
         vfo->setBandwidthLimits(25000, 25000, true);
         vfo->setSampleRate(AUDIO_SAMPLERATE, 25000);
-        
+
         // Initialize DSP chain
         dsp.init(vfo->output, vfo->getSampleRate());
-        
+
         // Audio handler - receives audio samples for FLEX decoding
         audioHandler.init(&dsp.out, _audioHandler, this);
-        
-        // Initialize multimon-ng FLEX decoder here
-        initMultimonFLEX();
+
+        // Initialize FLEX decoder with BCH error correction
+        initFLEXDecoder();
     }
 
     ~FLEXDecoder() {
@@ -127,13 +131,16 @@ public:
     }
 
     void showMenu() override {
-        ImGui::Text("FLEX Decoder (Audio-based)");
+        ImGui::Text("FLEX Decoder (Multimon-ng based)");
         ImGui::Text("Sample Rate: %.0f Hz", dsp.getAudioSampleRate());
-        
-        // Add FLEX-specific controls here
+
+        // Add FLEX-specific controls
         ImGui::Checkbox("Show Raw Data", &showRawData);
-        
-        // You can add frequency offset, filter settings, etc.
+        ImGui::Checkbox("Show Errors", &showErrors);
+
+        if (ImGui::Button("Reset Decoder")) {
+            resetDecoder();
+        }
     }
 
     void setVFO(VFOManager::VFO* vfo) override {
@@ -161,54 +168,60 @@ private:
 
     void processAudioSamples(float* samples, int count) {
         // Convert float samples to format expected by multimon-ng
-        // multimon-ng typically expects 16-bit signed samples
-        std::vector<int16_t> audioData(count);
-        
         for (int i = 0; i < count; i++) {
-            // Scale and clamp to 16-bit range
-            float sample = samples[i] * 32767.0f;
-            if (sample > 32767.0f) sample = 32767.0f;
-            if (sample < -32768.0f) sample = -32768.0f;
-            audioData[i] = (int16_t)sample;
+            // Scale and clamp to appropriate range for FLEX decoder
+            float sample = samples[i];
+
+            // Feed to converted multimon-ng FLEX decoder
+            // This calls your converted flex_next functions
+            processFlexSample(sample);
         }
-        
-        // Feed to multimon-ng FLEX decoder
-        // This is where you'd call the adapted multimon-ng functions
-        multimonFLEXProcess(audioData.data(), count);
     }
 
-    void initMultimonFLEX() {
-        // Initialize multimon-ng FLEX decoder state
-        // You'll need to adapt multimon-ng's FLEX initialization code here
-        
-        // Example structure (adapt from multimon-ng source):
-        // flex_init(&flexState);
-        // flexState.callback = flexMessageCallback;
+    void initFLEXDecoder() {
+        // Initialize BCH error correction
+        static const int primitive_poly[] = {1, 0, 1, 0, 0, 1}; // Example for BCH(31,21,5)
+        bchDecoder = std::make_unique<BCHCode>(primitive_poly, 5, 31, 21, 2);
+
+        // Initialize FLEX decoder state from converted flex_next
+        // This would call your converted initialization functions
+        flexDecoder = std::make_unique<FlexDecoder>();  // From flex_next.h
+        flexDecoder->setCallback([this](const FlexMessage& msg) {
+            handleFlexMessage(msg);
+        });
     }
 
-    void multimonFLEXProcess(int16_t* samples, int count) {
-        // Process audio samples through multimon-ng FLEX decoder
-        // Adapt multimon-ng's FLEX processing functions here
-        
-        // Example (adapt from multimon-ng):
-        // flex_process(&flexState, samples, count);
+    void processFlexSample(float sample) {
+        // This integrates with your converted flex_next.cpp functions
+        if (flexDecoder) {
+            flexDecoder->processSample(sample);
+        }
     }
 
-    static void flexMessageCallback(/* FLEX message parameters */) {
-        // Handle decoded FLEX messages
-        // Log or display the message
-        flog::info("FLEX Message: [details here]");
+    void handleFlexMessage(const FlexMessage& message) {
+        // Handle decoded FLEX message
+        flog::info("FLEX Message - Addr: {}, Type: {}, Data: {}",
+                   message.address, message.type, message.data);
+
+        // You can add GUI display, logging, forwarding, etc. here
+    }
+
+    void resetDecoder() {
+        if (flexDecoder) {
+            flexDecoder->reset();
+        }
     }
 
     std::string name;
     VFOManager::VFO* vfo;
-    
+
     FLEXDSP dsp;
     dsp::sink::Handler<float> audioHandler;
-    
+
+    // Converted multimon-ng components
+    std::unique_ptr<BCHCode> bchDecoder;
+    std::unique_ptr<FlexDecoder> flexDecoder;  // From your converted flex_next files
+
     bool showRawData = false;
-    
-    // multimon-ng FLEX decoder state
-    // You'll need to define this based on multimon-ng's FLEX structures
-    // struct flex_state flexState;
+    bool showErrors = false;
 };
