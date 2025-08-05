@@ -5,93 +5,128 @@
 #include <gui/widgets/symbol_diagram.h>
 #include <gui/style.h>
 #include <dsp/sink/handler_sink.h>
-#include "flex.h"
-#include "dsp.h"
+#include <utils/flog.h>
+#include <memory>
+#include "dsp.h"           // Local FLEX DSP header
+#include "flex_next.h"     // FlexDecoderWrapper
+#include "../BCHCode.h"    // BCH error correction (up one directory)
 
 class FLEXDecoder : public Decoder {
-    dsp::stream<float> dummy1;
-    dsp::stream<uint8_t> dummy2;
 public:
-    FLEXDecoder(const std::string& name, VFOManager::VFO* vfo) : diag(0.6, 1600) {
-        this->name = name;
-        this->vfo = vfo;
+    FLEXDecoder(const std::string& name, VFOManager::VFO* vfo) : name(name), vfo(vfo) {
+        // Set VFO parameters for FLEX (typically 929-932 MHz, 25kHz bandwidth)
+        vfo->setBandwidthLimits(25000, 25000, true);
+        vfo->setSampleRate(PAGER_AUDIO_SAMPLERATE, 25000);
 
-        // Define baudrate options
-        baudrates.define(1600, "1600 Baud", 1600);
-        baudrates.define(3200, "3200 Baud", 3200);
-        baudrates.define(6400, "6400 Baud", 6400);
+        // Initialize DSP chain
+        dsp.init(vfo->output, 24000);
 
-        // Init DSP
-        vfo->setBandwidthLimits(12500, 12500, true);
-        vfo->setSampleRate(16000, 12500);
-        reshape.init(&dummy1, 1600.0, (1600 / 30.0) - 1600.0);
-        dataHandler.init(&dummy2, _dataHandler, this);
-        diagHandler.init(&reshape.out, _diagHandler, this);
+        // Audio handler - receives audio samples for FLEX decoding
+        audioHandler.init(&dsp.out, _audioHandler, this);
+
+        // Initialize FLEX decoder with BCH error correction
+        initFLEXDecoder();
     }
 
     ~FLEXDecoder() {
         stop();
     }
 
-    void showMenu() {
-        ImGui::LeftLabel("Baudrate");
-        ImGui::FillWidth();
-        if (ImGui::Combo(("##pager_decoder_flex_br_" + name).c_str(), &brId, baudrates.txt)) {
-            // TODO
+    void showMenu() override {
+        ImGui::Text("FLEX Decoder (Multimon-ng based)");
+        ImGui::Text("Sample Rate: %.0f Hz", dsp.getAudioSampleRate());
+
+        // Add FLEX-specific controls
+        ImGui::Checkbox("Show Raw Data", &showRawData);
+        ImGui::Checkbox("Show Errors", &showErrors);
+
+        if (ImGui::Button("Reset Decoder")) {
+            resetDecoder();
         }
-
-        ImGui::FillWidth();
-        diag.draw();
     }
 
-    void setVFO(VFOManager::VFO* vfo) {
+    void setVFO(VFOManager::VFO* vfo) override {
         this->vfo = vfo;
-        vfo->setBandwidthLimits(12500, 12500, true);
-        vfo->setSampleRate(24000, 12500);
-        // dsp.setInput(vfo->output);
+        vfo->setBandwidthLimits(25000, 25000, true);
+        vfo->setSampleRate(PAGER_AUDIO_SAMPLERATE, 25000);
+        dsp.setInput(vfo->output);
     }
 
-    void start() {
-        flog::debug("FLEX start");
-        // dsp.start();
-        reshape.start();
-        dataHandler.start();
-        diagHandler.start();
+    void start() override {
+        dsp.start();
+        audioHandler.start();
     }
 
-    void stop() {
-        flog::debug("FLEX stop");
-        // dsp.stop();
-        reshape.stop();
-        dataHandler.stop();
-        diagHandler.stop();
+    void stop() override {
+        dsp.stop();
+        audioHandler.stop();
     }
 
 private:
-    static void _dataHandler(uint8_t* data, int count, void* ctx) {
+    static void _audioHandler(float* data, int count, void* ctx) {
         FLEXDecoder* _this = (FLEXDecoder*)ctx;
-        // _this->decoder.process(data, count);
+        _this->processAudioSamples(data, count);
     }
 
-    static void _diagHandler(float* data, int count, void* ctx) {
-        FLEXDecoder* _this = (FLEXDecoder*)ctx;
-        float* buf = _this->diag.acquireBuffer();
-        memcpy(buf, data, count * sizeof(float));
-        _this->diag.releaseBuffer();
+    void processAudioSamples(float* samples, int count) {
+        // Convert float samples to format expected by multimon-ng
+        for (int i = 0; i < count; i++) {
+            // Scale and clamp to appropriate range for FLEX decoder
+            float sample = samples[i];
+
+            // Feed to converted multimon-ng FLEX decoder
+            // This calls your converted flex_next functions
+            processFlexSample(sample);
+        }
+    }
+
+    void initFLEXDecoder() {
+        // Initialize BCH error correction
+        static const int primitive_poly[] = {1, 0, 1, 0, 0, 1}; // Example for BCH(31,21,5)
+        bchDecoder = std::make_unique<BCHCode>(primitive_poly, 5, 31, 21, 2);
+
+        // Initialize FLEX decoder wrapper
+        flexDecoder = std::make_unique<FlexDecoderWrapper>();
+        flexDecoder->setMessageCallback([this](int64_t addr, int type, const std::string& data) {
+            handleFlexMessage(addr, type, data);
+        });
+    }
+
+    void processFlexSample(float sample) {
+        // This integrates with your converted flex_next.cpp functions
+        if (flexDecoder) {
+            flexDecoder->processSample(sample);
+        }
+    }
+
+    void handleFlexMessage(int64_t address, int type, const std::string& data) {
+        // Console output for testing
+        printf("FLEX: Addr=%ld Type=%d Data=%s\n",
+               address, type, data.c_str());
+
+        // Also use flog for SDR++ logging
+        flog::info("FLEX Message - Addr: {}, Type: {}, Data: {}",
+                   address, type, data);
+
+        // You can add GUI display, logging, forwarding, etc. here
+    }
+
+    void resetDecoder() {
+        if (flexDecoder) {
+            flexDecoder->reset();
+        }
     }
 
     std::string name;
-
     VFOManager::VFO* vfo;
-    dsp::buffer::Reshaper<float> reshape;
-    dsp::sink::Handler<uint8_t> dataHandler;
-    dsp::sink::Handler<float> diagHandler;
 
-    flex::Decoder decoder;
+    FLEXDSP dsp;
+    dsp::sink::Handler<float> audioHandler;
 
-    ImGui::SymbolDiagram diag;
+    // Converted multimon-ng components
+    std::unique_ptr<BCHCode> bchDecoder;
+    std::unique_ptr<FlexDecoderWrapper> flexDecoder;
 
-    int brId = 0;
-
-    OptionList<int, int> baudrates;
+    bool showRawData = false;
+    bool showErrors = false;
 };

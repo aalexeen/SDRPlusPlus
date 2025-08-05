@@ -1,3 +1,4 @@
+
 cmake_minimum_required(VERSION 3.13)
 project(sdrpp)
 
@@ -357,11 +358,11 @@ if (OPT_BUILD_SCHEDULER)
     add_subdirectory("misc_modules/scheduler")
 endif (OPT_BUILD_SCHEDULER)
 
+# Main executable - REMOVED the problematic header references
 if (MSVC)
     add_executable(sdrpp "src/main.cpp" "win32/resources.rc")
 else ()
-    add_executable(sdrpp "src/main.cpp"
-            decoder_modules/pager_decoder/src/flex/dsp.h)
+    add_executable(sdrpp "src/main.cpp")
 endif ()
 
 target_link_libraries(sdrpp PRIVATE sdrpp_core)
@@ -407,8 +408,6 @@ endif ()
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     add_custom_target(do_always ALL cp \"$<TARGET_FILE_DIR:sdrpp_core>/libsdrpp_core.dylib\" \"$<TARGET_FILE_DIR:sdrpp>\")
 endif ()
-
-# cmake .. "-DCMAKE_TOOLCHAIN_FILE=C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake" -DOPT_BUILD_BLADERF_SOURCE=ON -DOPT_BUILD_LIMESDR_SOURCE=ON -DOPT_BUILD_SDRPLAY_SOURCE=ON -DOPT_BUILD_M17_DECODER=ON -DOPT_BUILD_SCANNER=ON -DOPT_BUILD_SCHEDULER=ON -DOPT_BUILD_USRP_SOURCE=ON -DOPT_BUILD_PAGER_DECODER=ON
 
 # Create module cmake file
 configure_file(${CMAKE_SOURCE_DIR}/sdrpp_module.cmake ${CMAKE_CURRENT_BINARY_DIR}/sdrpp_module.cmake @ONLY)

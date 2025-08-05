@@ -1,12 +1,15 @@
 #pragma once
-#include "../decoder.h"
+#include "../decoder.h"  // Base decoder class
 #include <signal_path/vfo_manager.h>
 #include <utils/optionlist.h>
 #include <gui/widgets/symbol_diagram.h>
 #include <gui/style.h>
 #include <dsp/sink/handler_sink.h>
-#include "dsp.h"
-#include "pocsag.h"
+#include <dsp/buffer/reshaper.h>
+#include <utils/flog.h>
+#include <imgui.h>
+#include "dsp.h"      // POCSAG DSP (in same directory)
+#include "pocsag.h"   // POCSAG protocol (in same directory)
 
 #define BAUDRATE    2400
 #define SAMPLERATE  (BAUDRATE*10)
@@ -38,32 +41,32 @@ public:
         stop();
     }
 
-    void showMenu() {
+    void showMenu() override {
         ImGui::LeftLabel("Baudrate");
         ImGui::FillWidth();
         if (ImGui::Combo(("##pager_decoder_pocsag_br_" + name).c_str(), &brId, baudrates.txt)) {
-            // TODO
+            // TODO: Update baudrate
         }
 
         ImGui::FillWidth();
         diag.draw();
     }
 
-    void setVFO(VFOManager::VFO* vfo) {
+    void setVFO(VFOManager::VFO* vfo) override {
         this->vfo = vfo;
         vfo->setBandwidthLimits(12500, 12500, true);
-        vfo->setSampleRate(24000, 12500);
+        vfo->setSampleRate(SAMPLERATE, 12500);
         dsp.setInput(vfo->output);
     }
 
-    void start() {
+    void start() override {
         dsp.start();
         reshape.start();
         dataHandler.start();
         diagHandler.start();
     }
 
-    void stop() {
+    void stop() override {
         dsp.stop();
         reshape.stop();
         dataHandler.stop();

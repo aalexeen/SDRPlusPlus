@@ -8,8 +8,8 @@
 #include <gui/widgets/folder_select.h>
 #include <utils/optionlist.h>
 #include "decoder.h"
-#include "pocsag/decoder.h"
-#include "flex/decoder.h"
+#include "pocsag/decoder.h"  // Your existing POCSAG decoder
+#include "flex/decoder.h"    // FLEX decoder
 
 #define CONCAT(a, b) ((std::string(a) + b).c_str())
 
@@ -42,8 +42,9 @@ public:
         vfo = sigpath::vfoManager.createVFO(name, ImGui::WaterfallVFO::REF_CENTER, 0, 12500, 24000, 12500, 12500, true);
         vfo->setSnapInterval(1);
 
-        // Select the protocol
-        selectProtocol(PROTOCOL_POCSAG);
+        // Create initial decoder but don't start it yet
+        decoder = std::make_unique<POCSAGDecoder>(name, vfo);
+        proto = PROTOCOL_POCSAG;
 
         gui::menu.registerEntry(name, menuHandler, this, this);
     }
@@ -51,9 +52,11 @@ public:
     ~PagerDecoderModule() {
         gui::menu.removeEntry(name);
         // Stop DSP
-        if (enabled) {
+        if (enabled && decoder) {
             decoder->stop();
             decoder.reset();
+        }
+        if (vfo) {
             sigpath::vfoManager.deleteVFO(vfo);
         }
 
@@ -63,19 +66,28 @@ public:
     void postInit() {}
 
     void enable() {
-        double bw = gui::waterfall.getBandwidth();
-        vfo = sigpath::vfoManager.createVFO(name, ImGui::WaterfallVFO::REF_CENTER, std::clamp<double>(0, -bw / 2.0, bw / 2.0), 12500, 24000, 12500, 12500, true);
-        vfo->setSnapInterval(1);
+        if (enabled) return;
 
-        decoder->setVFO(vfo);
-        decoder->start();
+        double bw = gui::waterfall.getBandwidth();
+        if (!vfo) {
+            vfo = sigpath::vfoManager.createVFO(name, ImGui::WaterfallVFO::REF_CENTER, std::clamp<double>(0, -bw / 2.0, bw / 2.0), 12500, 24000, 12500, 12500, true);
+            vfo->setSnapInterval(1);
+        }
+
+        if (decoder) {
+            decoder->setVFO(vfo);
+            decoder->start();
+        }
 
         enabled = true;
     }
 
     void disable() {
-        decoder->stop();
-        sigpath::vfoManager.deleteVFO(vfo);
+        if (!enabled) return;
+
+        if (decoder) {
+            decoder->stop();
+        }
         enabled = false;
     }
 
@@ -84,11 +96,14 @@ public:
     }
 
     void selectProtocol(Protocol newProto) {
-        // Cannot change while disabled
-        if (!enabled) { return; }
-
         // If the protocol hasn't changed, no need to do anything
         if (newProto == proto) { return; }
+
+        // Stop current decoder if running
+        bool wasRunning = enabled;
+        if (wasRunning && decoder) {
+            decoder->stop();
+        }
 
         // Delete current decoder
         decoder.reset();
@@ -106,8 +121,11 @@ public:
             return;
         }
 
-        // Start the new decoder
-        decoder->start();
+        // Start the new decoder if we were running before
+        if (wasRunning && decoder) {
+            decoder->setVFO(vfo);
+            decoder->start();
+        }
 
         // Save selected protocol
         proto = newProto;

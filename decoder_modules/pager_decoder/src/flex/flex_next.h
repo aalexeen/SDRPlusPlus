@@ -168,10 +168,6 @@ Flex_Next* Flex_New(unsigned int sampleFrequency);
 void Flex_Delete(Flex_Next* flex);
 void Flex_Demodulate(Flex_Next* flex, double sample);
 
-// BCH Error Correction Functions (placeholders)
-struct BCHCode* BCHCode_New(int* p, int t, int n, int k, int d);
-void BCHCode_Delete(struct BCHCode* bch);
-int BCHCode_Decode(struct BCHCode* bch, int* recd);
 
 // Helper function declarations
 static unsigned int count_bits(struct Flex_Next* flex, unsigned int data);

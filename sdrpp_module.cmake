@@ -6,13 +6,9 @@ if (NOT SDRPP_MODULE_COMPILER_FLAGS)
     set(SDRPP_MODULE_COMPILER_FLAGS @SDRPP_MODULE_COMPILER_FLAGS@)
 endif ()
 
-# Created shared lib and link to core
-add_library(${PROJECT_NAME} SHARED ${SRC}
-        decoder_modules/pager_decoder/src/flex/flex_next.h
-        decoder_modules/pager_decoder/src/flex/flex_next.cpp
-        decoder_modules/pager_decoder/src/flex/BCHCode.h
-        decoder_modules/pager_decoder/src/flex/BCHCode.cpp
-        decoder_modules/pager_decoder/src/flex/BCHCode_stub.cpp)
+# Create shared lib and link to core
+# Only use the ${SRC} variable - each module's CMakeLists.txt populates this
+add_library(${PROJECT_NAME} SHARED ${SRC})
 target_link_libraries(${PROJECT_NAME} PRIVATE sdrpp_core)
 target_include_directories(${PROJECT_NAME} PRIVATE "${SDRPP_CORE_ROOT}/src/")
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")

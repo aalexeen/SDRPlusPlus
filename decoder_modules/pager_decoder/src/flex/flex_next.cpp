@@ -1,10 +1,12 @@
 #include "flex_next.h"
+#include "../BCHCode.h"
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <cstdarg>  // For va_list, va_start, va_end
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>  // For PRId64 format specifier
+#include <utils/flog.h>
 
 // Logging function (replace multimon-ng's verbprintf)
 static void verbprintf(int level, const char* format, ...) {
@@ -58,40 +60,43 @@ Flex_Next* Flex_New(unsigned int sampleFrequency) {
 }
 
 //=============================================================================
-// C Wrapper -
+// C++ Wrapper Implementation
 //=============================================================================
-FlexDecoderWrapper::FlexDecoderWrapper() {
-    // Initialize your converted C struct here
-    // This should call whatever init function you have from the original C code
-    flex_state = /* initialize your Flex_Next struct */;
 
-    // Set up the static callback bridge
-    /* your_c_function_to_set_callback(staticMessageCallback, this); */
+FlexDecoderWrapper::FlexDecoderWrapper() : flex_state(nullptr) {
+    // Initialize the FLEX decoder with standard audio sample rate
+    flex_state = Flex_New(FREQ_SAMP);
+    if (!flex_state) {
+        flog::error("Failed to initialize FLEX decoder");
+    }
 }
 
 FlexDecoderWrapper::~FlexDecoderWrapper() {
-    // Clean up your C struct
+    // Clean up the FLEX decoder
     if (flex_state) {
-        /* cleanup your flex state */
+        Flex_Delete(static_cast<Flex_Next*>(flex_state));
         flex_state = nullptr;
     }
 }
 
 void FlexDecoderWrapper::processSample(float sample) {
     if (flex_state) {
-        // Call your actual C function that processes audio samples
-        /* your_c_process_sample_function(flex_state, sample); */
+        // Call the main FLEX demodulation function
+        Flex_Demodulate(static_cast<Flex_Next*>(flex_state), static_cast<double>(sample));
     }
 }
 
 void FlexDecoderWrapper::setMessageCallback(std::function<void(int64_t, int, const std::string&)> callback) {
     messageCallback = callback;
+    // Note: The actual callback integration would require modifying the C code
+    // to call back to C++ when messages are decoded. For now, this stores the callback.
 }
 
 void FlexDecoderWrapper::reset() {
     if (flex_state) {
-        // Call your C reset function
-        /* your_c_reset_function(flex_state); */
+        // Reset the decoder state by reinitializing
+        Flex_Delete(static_cast<Flex_Next*>(flex_state));
+        flex_state = Flex_New(FREQ_SAMP);
     }
 }
 
@@ -103,7 +108,6 @@ void FlexDecoderWrapper::staticMessageCallback(int64_t addr, int type, const cha
         wrapper->messageCallback(addr, type, dataStr);
     }
 }
-
 
 //=============================================================================
 // FLEX_DELETE - Destructor Function
@@ -238,27 +242,6 @@ void FLEXNextDecoder::processAudioSamples(const float* buffer, int length) {
 
 bool FLEXNextDecoder::isInitialized() const {
     return initialized;
-}
-
-//=============================================================================
-// PLACEHOLDER FUNCTIONS (to be implemented next)
-//=============================================================================
-
-// BCH Error Correction Placeholders
-struct BCHCode* BCHCode_New(int* p, int t, int n, int k, int d) {
-    // Placeholder - will implement BCH error correction later
-    verbprintf(3, "FLEX_NEXT: BCHCode_New placeholder called\n");
-    return (struct BCHCode*)malloc(1); // Dummy allocation
-}
-
-void BCHCode_Delete(struct BCHCode* bch) {
-    // Placeholder - will implement BCH cleanup later
-    if (bch) free(bch);
-}
-
-int BCHCode_Decode(struct BCHCode* bch, int* recd) {
-    // Placeholder - will implement BCH decoding later
-    return 0; // Return no errors for now
 }
 
 // Core processing function - Symbol Building and Timing Recovery
@@ -1113,7 +1096,7 @@ static void decode_phase(struct Flex_Next* flex, char PhaseNo) {
         uint32_t viw = phaseptr[j];
 
         // Extract VIW fields
-        flex->Decode.type = ((viw >> 4) & 0x7L);
+        flex->Decode.type = static_cast<Flex_PageTypeEnum>((viw >> 4) & 0x7L);
         unsigned int mw1 = (viw >> 7) & 0x7F;
         unsigned int len = (viw >> 14) & 0x7F;
         unsigned int hdr;

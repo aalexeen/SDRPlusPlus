@@ -84,12 +84,13 @@ void BCHCode::generatePolynomial() {
     
     int cycle[15][6], size[15], min[11], zeros[11];
     int test, aux, nocycles, root, noterms, rdncy;
-    
+    int ll = 0;  // Declare ll here at function scope
+
     // Generate cycle sets modulo n_
     cycle[0][0] = 0; size[0] = 1;
     cycle[1][0] = 1; size[1] = 1;
     int jj = 1;  // cycle set index
-    
+
     do {
         // Generate the jj-th cycle set
         int ii = 0;
@@ -99,9 +100,9 @@ void BCHCode::generatePolynomial() {
             size[jj]++;
             aux = (cycle[jj][ii] * 2) % n_;
         } while (aux != cycle[jj][0]);
-        
+
         // Next cycle set representative
-        int ll = 0;
+        ll = 0;  // Reset ll here
         do {
             ll++;
             test = 0;

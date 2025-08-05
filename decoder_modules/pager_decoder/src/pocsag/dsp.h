@@ -10,6 +10,9 @@
 #include <dsp/loop/fast_agc.h>
 #include <dsp/digital/binary_slicer.h>
 #include <dsp/routing/doubler.h>
+#include <dsp/filter/fir.h>
+#include <dsp/taps/tap.h>
+#include "../dsp.h"  // Include common DSP definitions
 
 class POCSAGDSP : public dsp::Processor<dsp::complex_t, uint8_t> {
     using base_type = dsp::Processor<dsp::complex_t, uint8_t>;
@@ -20,6 +23,7 @@ public:
     void init(dsp::stream<dsp::complex_t>* in, double samplerate, double baudrate) {
         // Save settings
         _samplerate = samplerate;
+        _baudrate = baudrate;
 
         // Configure blocks
         demod.init(NULL, -4500.0, samplerate);
@@ -48,7 +52,10 @@ public:
         assert(base_type::_block_init);
         std::lock_guard<std::recursive_mutex> lck(base_type::ctrlMtx);
         base_type::tempStop();
-        
+
+        _baudrate = baudrate;
+        recov.setOmega(_samplerate / baudrate);
+
         base_type::tempStart();
     }
 
@@ -73,4 +80,5 @@ private:
     dsp::clock_recovery::MM<float> recov;
 
     double _samplerate;
+    double _baudrate;
 };
