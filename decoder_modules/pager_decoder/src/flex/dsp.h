@@ -183,11 +183,10 @@ private:
         static const int primitive_poly[] = {1, 0, 1, 0, 0, 1}; // Example for BCH(31,21,5)
         bchDecoder = std::make_unique<BCHCode>(primitive_poly, 5, 31, 21, 2);
 
-        // Initialize FLEX decoder state from converted flex_next
-        // This would call your converted initialization functions
-        flexDecoder = std::make_unique<FlexDecoder>();  // From flex_next.h
-        flexDecoder->setCallback([this](const FlexMessage& msg) {
-            handleFlexMessage(msg);
+        // Initialize FLEX decoder wrapper
+        flexDecoder = std::make_unique<FlexDecoderWrapper>();
+        flexDecoder->setMessageCallback([this](int64_t addr, int type, const std::string& data) {
+            handleFlexMessage(addr, type, data);
         });
     }
 
@@ -198,10 +197,15 @@ private:
         }
     }
 
-    void handleFlexMessage(const FlexMessage& message) {
-        // Handle decoded FLEX message
+    void handleFlexMessage(int64_t address, int type, const std::string& data) {
+
+        // Console output for testing
+        printf("FLEX: Addr=%ld Type=%d Data=%s\n",
+           address, type, data.c_str());  // Use parameters directly
+
+        // Also use flog for SDR++ logging
         flog::info("FLEX Message - Addr: {}, Type: {}, Data: {}",
-                   message.address, message.type, message.data);
+                   address, type, data);  // Use parameters directly
 
         // You can add GUI display, logging, forwarding, etc. here
     }
@@ -220,7 +224,7 @@ private:
 
     // Converted multimon-ng components
     std::unique_ptr<BCHCode> bchDecoder;
-    std::unique_ptr<FlexDecoder> flexDecoder;  // From your converted flex_next files
+    std::unique_ptr<FlexDecoderWrapper> flexDecoder;  // Use wrapper instead of FlexDecoder
 
     bool showRawData = false;
     bool showErrors = false;

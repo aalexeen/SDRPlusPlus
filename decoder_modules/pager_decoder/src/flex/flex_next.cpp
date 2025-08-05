@@ -58,6 +58,54 @@ Flex_Next* Flex_New(unsigned int sampleFrequency) {
 }
 
 //=============================================================================
+// C Wrapper -
+//=============================================================================
+FlexDecoderWrapper::FlexDecoderWrapper() {
+    // Initialize your converted C struct here
+    // This should call whatever init function you have from the original C code
+    flex_state = /* initialize your Flex_Next struct */;
+
+    // Set up the static callback bridge
+    /* your_c_function_to_set_callback(staticMessageCallback, this); */
+}
+
+FlexDecoderWrapper::~FlexDecoderWrapper() {
+    // Clean up your C struct
+    if (flex_state) {
+        /* cleanup your flex state */
+        flex_state = nullptr;
+    }
+}
+
+void FlexDecoderWrapper::processSample(float sample) {
+    if (flex_state) {
+        // Call your actual C function that processes audio samples
+        /* your_c_process_sample_function(flex_state, sample); */
+    }
+}
+
+void FlexDecoderWrapper::setMessageCallback(std::function<void(int64_t, int, const std::string&)> callback) {
+    messageCallback = callback;
+}
+
+void FlexDecoderWrapper::reset() {
+    if (flex_state) {
+        // Call your C reset function
+        /* your_c_reset_function(flex_state); */
+    }
+}
+
+// Static callback bridge - converts C callback to C++ callback
+void FlexDecoderWrapper::staticMessageCallback(int64_t addr, int type, const char* data, void* userdata) {
+    FlexDecoderWrapper* wrapper = static_cast<FlexDecoderWrapper*>(userdata);
+    if (wrapper && wrapper->messageCallback) {
+        std::string dataStr(data ? data : "");
+        wrapper->messageCallback(addr, type, dataStr);
+    }
+}
+
+
+//=============================================================================
 // FLEX_DELETE - Destructor Function
 //=============================================================================
 void Flex_Delete(Flex_Next* flex) {

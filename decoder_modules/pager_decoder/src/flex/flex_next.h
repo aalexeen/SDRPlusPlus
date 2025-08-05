@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
+#include <functional>
+#include <string>
 
 // All the #defines from original multimon-ng
 #define FREQ_SAMP            22050
@@ -199,3 +201,22 @@ static int is_alphanumeric_page(struct Flex_Next* flex);
 static int is_numeric_page(struct Flex_Next* flex);
 static int is_tone_page(struct Flex_Next* flex);
 static int is_binary_page(struct Flex_Next* flex);
+
+// Simple C++ wrapper around your converted C code
+class FlexDecoderWrapper {
+public:
+    FlexDecoderWrapper();
+    ~FlexDecoderWrapper();
+
+    void processSample(float sample);
+    void setMessageCallback(std::function<void(int64_t, int, const std::string&)> callback);
+    void reset();
+
+private:
+    // Your actual C struct/data from converted flex_next code
+    void* flex_state;  // Points to your converted Flex_Next struct
+    std::function<void(int64_t, int, const std::string&)> messageCallback;
+
+    // Static callback bridge for C code
+    static void staticMessageCallback(int64_t addr, int type, const char* data, void* userdata);
+};
