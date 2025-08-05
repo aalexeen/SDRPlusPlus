@@ -4,6 +4,9 @@
 #include <cstring>
 #include <iostream>
 #include <cstdarg>  // For va_list, va_start, va_end
+#include <climits>    // For INT_MAX, UINT_MAX
+#include <cmath>      // For std::isfinite, std::clamp
+#include <algorithm>  // For std::clamp, std::min, std::max
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>  // For PRId64 format specifier
 #include <utils/flog.h>
@@ -23,14 +26,17 @@ static void verbprintf(int level, const char* format, ...) {
 // FLEX_NEW - Constructor Function
 //=============================================================================
 Flex_Next* Flex_New(unsigned int sampleFrequency) {
-    // Allocate memory for main FLEX structure
-    Flex_Next* flex = (Flex_Next*)malloc(sizeof(Flex_Next));
-    if (flex == nullptr) {
+    if (sampleFrequency == 0 || sampleFrequency > 1000000) {
+        flog::error("Invalid sample frequency: {}", sampleFrequency);
         return nullptr;
     }
 
-    // Initialize all memory to zero
-    memset(flex, 0, sizeof(Flex_Next));
+    // Allocate memory for main FLEX structure
+    Flex_Next* flex = (Flex_Next*)calloc(1, sizeof(Flex_Next)); // Use calloc for zero-init
+    if (flex == nullptr) {
+        flog::error("Failed to allocate memory for FLEX structure");
+        return nullptr;
+    }
 
     // Set up demodulator parameters
     flex->Demodulator.sample_freq = sampleFrequency;
@@ -45,6 +51,7 @@ Flex_Next* Flex_New(unsigned int sampleFrequency) {
 
     flex->Decode.BCHCode = BCHCode_New(p, 5, 31, 21, 2);
     if (flex->Decode.BCHCode == nullptr) {
+        flog::error("Failed to initialize BCH decoder");
         Flex_Delete(flex);
         return nullptr;
     }
@@ -54,6 +61,10 @@ Flex_Next* Flex_New(unsigned int sampleFrequency) {
         flex->GroupHandler.GroupFrame[g] = -1;
         flex->GroupHandler.GroupCycle[g] = -1;
     }
+
+	// Initialize state
+    flex->State.Current = FLEX_STATE_SYNC1;
+    flex->State.Previous = FLEX_STATE_SYNC1;
 
     verbprintf(2, "FLEX_NEXT: Initialized for %u Hz sample rate\n", sampleFrequency);
     return flex;
@@ -68,6 +79,8 @@ FlexDecoderWrapper::FlexDecoderWrapper() : flex_state(nullptr) {
     flex_state = Flex_New(FREQ_SAMP);
     if (!flex_state) {
         flog::error("Failed to initialize FLEX decoder");
+    } else {
+        flog::info("FLEX decoder initialized successfully");
     }
 }
 
@@ -81,8 +94,11 @@ FlexDecoderWrapper::~FlexDecoderWrapper() {
 
 void FlexDecoderWrapper::processSample(float sample) {
     if (flex_state) {
-        // Call the main FLEX demodulation function
-        Flex_Demodulate(static_cast<Flex_Next*>(flex_state), static_cast<double>(sample));
+        // Add bounds checking for sample values
+        if (std::isfinite(sample)) {
+            // Call the main FLEX demodulation function
+            Flex_Demodulate(static_cast<Flex_Next*>(flex_state), static_cast<double>(sample));
+        }
     }
 }
 
@@ -97,6 +113,9 @@ void FlexDecoderWrapper::reset() {
         // Reset the decoder state by reinitializing
         Flex_Delete(static_cast<Flex_Next*>(flex_state));
         flex_state = Flex_New(FREQ_SAMP);
+        if (!flex_state) {
+            flog::error("Failed to reinitialize FLEX decoder");
+        }
     }
 }
 
@@ -246,15 +265,36 @@ bool FLEXNextDecoder::isInitialized() const {
 
 // Core processing function - Symbol Building and Timing Recovery
 static int buildSymbol(struct Flex_Next* flex, double sample) {
-    if (flex == nullptr) return 0;
+    if (flex == nullptr) {
+        return 0;
+    }
+
+    // Validate sample value
+    if (!std::isfinite(sample)) {
+        return 0;
+    }
+
+    // Clamp sample to reasonable range
+    sample = std::clamp(sample, -100.0, 100.0);
 
     // Calculate phase parameters for symbol timing
     const int64_t phase_max = 100 * flex->Demodulator.sample_freq;  // Maximum value for phase
     const int64_t phase_rate = phase_max * flex->Demodulator.baud / flex->Demodulator.sample_freq;  // Increment per sample
+
+    // Bounds check for phase
+    if (flex->Demodulator.phase < 0) {
+        flex->Demodulator.phase = 0;
+    }
+    if (flex->Demodulator.phase > phase_max * 2) {
+        flex->Demodulator.phase = phase_max / 2;
+    }
+
     const double phasepercent = 100.0 * flex->Demodulator.phase / phase_max;  // Current phase as percentage
 
-    // Update the sample counter
-    flex->Demodulator.sample_count++;
+    // Update the sample counter with overflow protection
+    if (flex->Demodulator.sample_count < UINT_MAX) {
+        flex->Demodulator.sample_count++;
+    }
 
     // Remove DC offset (FIR filter) - only during sync acquisition
     if (flex->State.Current == FLEX_STATE_SYNC1) {
@@ -267,8 +307,13 @@ static int buildSymbol(struct Flex_Next* flex, double sample) {
         // During the synchronization period, establish the envelope of the signal
         if (flex->State.Current == FLEX_STATE_SYNC1) {
             flex->Demodulator.envelope_sum += fabs(sample);
-            flex->Demodulator.envelope_count++;
-            flex->Modulation.envelope = flex->Demodulator.envelope_sum / flex->Demodulator.envelope_count;
+            if (flex->Demodulator.envelope_count < INT_MAX) {
+                flex->Demodulator.envelope_count++;
+            }
+
+            if (flex->Demodulator.envelope_count > 0) {
+                flex->Modulation.envelope = flex->Demodulator.envelope_sum / flex->Demodulator.envelope_count;
+            }
         }
     }
     else {
@@ -286,17 +331,29 @@ static int buildSymbol(struct Flex_Next* flex, double sample) {
     if (phasepercent > 10 && phasepercent < 90) {
         // Count the number of occurrences of each symbol value for analysis at end of symbol period
         // FLEX uses 4-level FSK: levels 0,1,2,3 representing different frequency shifts
+        double threshold = flex->Modulation.envelope * SLICE_THRESHOLD;
+
         if (sample > 0) {
-            if (sample > flex->Modulation.envelope * SLICE_THRESHOLD)
-                flex->Demodulator.symcount[3]++;  // Highest positive level
-            else
-                flex->Demodulator.symcount[2]++;  // Lower positive level
+            if (sample > threshold) {
+                if (flex->Demodulator.symcount[3] < INT_MAX) {
+                    flex->Demodulator.symcount[3]++;  // Highest positive level
+                }
+            } else {
+                if (flex->Demodulator.symcount[2] < INT_MAX) {
+                    flex->Demodulator.symcount[2]++;  // Lower positive level
+                }
+            }
         }
         else {
-            if (sample < -flex->Modulation.envelope * SLICE_THRESHOLD)
-                flex->Demodulator.symcount[0]++;  // Lowest negative level
-            else
-                flex->Demodulator.symcount[1]++;  // Higher negative level
+            if (sample < -threshold) {
+                if (flex->Demodulator.symcount[0] < INT_MAX) {
+                    flex->Demodulator.symcount[0]++;  // Lowest negative level
+                }
+            } else {
+                if (flex->Demodulator.symcount[1] < INT_MAX) {
+                    flex->Demodulator.symcount[1]++;  // Higher negative level
+                }
+            }
         }
     }
 
@@ -323,7 +380,9 @@ static int buildSymbol(struct Flex_Next* flex, double sample) {
 
         // If too many zero crossings occur within the mid 80% then indicate lock has been lost
         if (phasepercent > 10 && phasepercent < 90) {
-            flex->Demodulator.nonconsec++;
+            if (flex->Demodulator.nonconsec < INT_MAX) {
+                flex->Demodulator.nonconsec++;
+            }
             if (flex->Demodulator.nonconsec > 20 && flex->Demodulator.locked) {
                 verbprintf(1, "FLEX_NEXT: Synchronisation Lost\n");
                 flex->Demodulator.locked = 0;

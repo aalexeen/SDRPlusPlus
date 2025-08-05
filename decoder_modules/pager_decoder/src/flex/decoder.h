@@ -13,19 +13,31 @@
 
 class FLEXDecoder : public Decoder {
 public:
-    FLEXDecoder(const std::string& name, VFOManager::VFO* vfo) : name(name), vfo(vfo) {
-        // Set VFO parameters for FLEX (typically 929-932 MHz, 25kHz bandwidth)
-        vfo->setBandwidthLimits(25000, 25000, true);
-        vfo->setSampleRate(PAGER_AUDIO_SAMPLERATE, 25000);
+    FLEXDecoder(const std::string& name, VFOManager::VFO* vfo) : name(name), vfo(vfo), initialized(false) {
+        try {
+            // Set VFO parameters for FLEX (typically 929-932 MHz, 25kHz bandwidth)
+            vfo->setBandwidthLimits(25000, 25000, true);
+            vfo->setSampleRate(PAGER_AUDIO_SAMPLERATE, 25000);
 
-        // Initialize DSP chain
-        dsp.init(vfo->output, 24000);
+            // Initialize DSP chain with validation
+            dsp.init(vfo->output, 24000);  // Use fixed sample rate
 
-        // Audio handler - receives audio samples for FLEX decoding
-        audioHandler.init(&dsp.out, _audioHandler, this);
+            if (!dsp.isInitialized()) {
+                throw std::runtime_error("Failed to initialize FLEX DSP");
+            }
 
-        // Initialize FLEX decoder with BCH error correction
-        initFLEXDecoder();
+            // Audio handler - receives audio samples for FLEX decoding
+            audioHandler.init(&dsp.out, _audioHandler, this);
+
+            // Initialize FLEX decoder with BCH error correction
+            initFLEXDecoder();
+
+            initialized = true;
+            flog::info("FLEX decoder created successfully");
+        } catch (const std::exception& e) {
+            flog::error("Failed to create FLEX decoder: {}", e.what());
+            initialized = false;
+        }
     }
 
     ~FLEXDecoder() {
@@ -33,8 +45,15 @@ public:
     }
 
     void showMenu() override {
+        if (!initialized) {
+            ImGui::Text("FLEX Decoder (FAILED TO INITIALIZE)");
+            ImGui::Text("Check logs for initialization errors");
+            return;
+        }
+
         ImGui::Text("FLEX Decoder (Multimon-ng based)");
         ImGui::Text("Sample Rate: %.0f Hz", dsp.getAudioSampleRate());
+        ImGui::Text("DSP Status: %s", dsp.isInitialized() ? "OK" : "ERROR");
 
         // Add FLEX-specific controls
         ImGui::Checkbox("Show Raw Data", &showRawData);
@@ -46,74 +65,162 @@ public:
     }
 
     void setVFO(VFOManager::VFO* vfo) override {
-        this->vfo = vfo;
-        vfo->setBandwidthLimits(25000, 25000, true);
-        vfo->setSampleRate(PAGER_AUDIO_SAMPLERATE, 25000);
-        dsp.setInput(vfo->output);
+        if (!initialized) {
+            flog::warn("FLEX decoder not initialized, cannot set VFO");
+            return;
+        }
+
+        try {
+            this->vfo = vfo;
+            vfo->setBandwidthLimits(25000, 25000, true);
+            vfo->setSampleRate(PAGER_AUDIO_SAMPLERATE, 25000);
+            dsp.setInput(vfo->output);
+            flog::info("FLEX decoder VFO set successfully");
+        } catch (const std::exception& e) {
+            flog::error("Failed to set FLEX decoder VFO: {}", e.what());
+        }
     }
 
     void start() override {
-        dsp.start();
-        audioHandler.start();
+        if (!initialized) {
+            flog::error("Cannot start FLEX decoder - not initialized");
+            return;
+        }
+
+        if (!dsp.isInitialized()) {
+            flog::error("Cannot start FLEX decoder - DSP not initialized");
+            return;
+        }
+
+        try {
+            dsp.start();
+            audioHandler.start();
+            flog::info("FLEX decoder started");
+        } catch (const std::exception& e) {
+            flog::error("Failed to start FLEX decoder: {}", e.what());
+        }
     }
 
     void stop() override {
-        dsp.stop();
-        audioHandler.stop();
+        if (!initialized) return;
+
+        try {
+            audioHandler.stop();
+            dsp.stop();
+            flog::info("FLEX decoder stopped");
+        } catch (const std::exception& e) {
+            flog::error("Error stopping FLEX decoder: {}", e.what());
+        }
     }
 
 private:
     static void _audioHandler(float* data, int count, void* ctx) {
         FLEXDecoder* _this = (FLEXDecoder*)ctx;
-        _this->processAudioSamples(data, count);
+        if (_this && _this->initialized) {
+            _this->processAudioSamples(data, count);
+        }
     }
 
     void processAudioSamples(float* samples, int count) {
-        // Convert float samples to format expected by multimon-ng
-        for (int i = 0; i < count; i++) {
-            // Scale and clamp to appropriate range for FLEX decoder
-            float sample = samples[i];
+        if (!initialized || !samples || count <= 0) {
+            return;
+        }
 
-            // Feed to converted multimon-ng FLEX decoder
-            // This calls your converted flex_next functions
-            processFlexSample(sample);
+        // Log sample reception periodically for debugging
+        static int sample_counter = 0;
+        sample_counter += count;
+
+        if (sample_counter % (44100 * 5) == 0) {  // Log every 5 seconds
+            flog::info("FLEX decoder received {} samples (total: {})", count, sample_counter);
+        }
+
+        try {
+            // Process samples in smaller chunks to avoid overflow
+            const int CHUNK_SIZE = 1024;
+
+            for (int i = 0; i < count; i += CHUNK_SIZE) {
+                int chunk_size = std::min(CHUNK_SIZE, count - i);
+
+                for (int j = 0; j < chunk_size; j++) {
+                    float sample = samples[i + j];
+
+                    // Validate sample
+                    if (!std::isfinite(sample)) {
+                        continue; // Skip invalid samples
+                    }
+
+                    // Clamp sample to reasonable range
+                    sample = std::clamp(sample, -10.0f, 10.0f);
+
+                    // Feed to FLEX decoder
+                    processFlexSample(sample);
+                }
+            }
+        } catch (const std::exception& e) {
+            flog::error("Error processing FLEX samples: {}", e.what());
+        }
+    }
+
+    void processFlexSample(float sample) {
+        if (!initialized || !flexDecoder) {
+            return;
+        }
+
+        try {
+            flexDecoder->processSample(sample);
+        } catch (const std::exception& e) {
+            flog::error("Error in FLEX sample processing: {}", e.what());
+            // Don't rethrow to avoid cascading crashes
         }
     }
 
     void initFLEXDecoder() {
-        // Initialize BCH error correction
-        static const int primitive_poly[] = {1, 0, 1, 0, 0, 1}; // Example for BCH(31,21,5)
-        bchDecoder = std::make_unique<BCHCode>(primitive_poly, 5, 31, 21, 2);
+        try {
+            // Initialize BCH error correction
+            static const int primitive_poly[] = {1, 0, 1, 0, 0, 1}; // Example for BCH(31,21,5)
+            bchDecoder = std::make_unique<BCHCode>(primitive_poly, 5, 31, 21, 2);
 
-        // Initialize FLEX decoder wrapper
-        flexDecoder = std::make_unique<FlexDecoderWrapper>();
-        flexDecoder->setMessageCallback([this](int64_t addr, int type, const std::string& data) {
-            handleFlexMessage(addr, type, data);
-        });
-    }
+            // Initialize FLEX decoder wrapper
+            flexDecoder = std::make_unique<FlexDecoderWrapper>();
+            flexDecoder->setMessageCallback([this](int64_t addr, int type, const std::string& data) {
+                handleFlexMessage(addr, type, data);
+            });
 
-    void processFlexSample(float sample) {
-        // This integrates with your converted flex_next.cpp functions
-        if (flexDecoder) {
-            flexDecoder->processSample(sample);
+            flog::info("FLEX decoder components initialized");
+        } catch (const std::exception& e) {
+            flog::error("Failed to initialize FLEX decoder components: {}", e.what());
+            throw;
         }
     }
 
     void handleFlexMessage(int64_t address, int type, const std::string& data) {
-        // Console output for testing
-        printf("FLEX: Addr=%ld Type=%d Data=%s\n",
-               address, type, data.c_str());
+        try {
+            // Safe message handling
+            if (data.length() > 1000) {
+                flog::warn("FLEX message too long, truncating");
+                return;
+            }
 
-        // Also use flog for SDR++ logging
-        flog::info("FLEX Message - Addr: {}, Type: {}, Data: {}",
-                   address, type, data);
+            // Console output for testing
+            printf("FLEX: Addr=%ld Type=%d Data=%s\n", address, type, data.c_str());
 
-        // You can add GUI display, logging, forwarding, etc. here
+            // Also use flog for SDR++ logging
+            flog::info("FLEX Message - Addr: {}, Type: {}, Data: {}", address, type, data);
+        } catch (const std::exception& e) {
+            flog::error("Error handling FLEX message: {}", e.what());
+        }
     }
 
     void resetDecoder() {
-        if (flexDecoder) {
-            flexDecoder->reset();
+        if (!initialized) return;
+
+        try {
+            if (flexDecoder) {
+                flexDecoder->reset();
+                flog::info("FLEX decoder reset");
+            }
+        } catch (const std::exception& e) {
+            flog::error("Error resetting FLEX decoder: {}", e.what());
         }
     }
 
@@ -129,4 +236,5 @@ private:
 
     bool showRawData = false;
     bool showErrors = false;
+    bool initialized;
 };
