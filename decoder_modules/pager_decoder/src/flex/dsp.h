@@ -1,6 +1,8 @@
 #pragma once
 #include <dsp/stream.h>
 #include <dsp/demod/quadrature.h>
+#include <dsp/correction/dc_blocker.h>
+#include <dsp/loop/fast_agc.h>
 #include <utils/flog.h>
 #include "../dsp.h"
 
@@ -16,19 +18,19 @@ public:
         _samplerate = samplerate;
 
         try {
-            // Try different FM demod parameters - maybe the issue is with gain or deviation
-            // FLEX typical deviation is around ±4.5kHz, so try different values
-            fmDemod.init(nullptr, 4500.0, samplerate);  // Try positive deviation instead of 0.0
+            // FM demodulation - FLEX uses ±4.5kHz deviation typically
+            fmDemod.init(nullptr, 4500.0, samplerate);
 
-            // DON'T free the buffer yet - maybe that's causing the issue
-            // fmDemod.out.free();
+            // AGC for signal amplitude normalization
+            // FastAGC(input, setPoint, maxGain, rate, initGain)
+            agc.init(nullptr, 1.0, 10.0, 1e-3, 1.0);  // setPoint=1.0, maxGain=10.0, rate=1e-3, initGain=1.0
 
             // Initialize the base class
             base_type::init(in);
             initialized = true;
-            flog::info("Safer FM FLEX DSP initialized at {} Hz with ±4500 Hz deviation", samplerate);
+            flog::info("FLEX DSP initialized: FM demod (±4500 Hz) + AGC at {} Hz", samplerate);
         } catch (const std::exception& e) {
-            flog::error("Safer FM FLEX DSP initialization failed: {}", e.what());
+            flog::error("FLEX DSP initialization failed: {}", e.what());
             initialized = false;
             throw;
         }
@@ -46,15 +48,15 @@ public:
                 return count;
             }
 
-            // Validate buffers exist
+            // Validate input buffers exist
             if (!base_type::_in->readBuf || !base_type::out.writeBuf) {
-                flog::error("Safer FM FLEX DSP: Invalid buffers");
+                flog::error("FLEX DSP: Invalid input/output buffers");
                 return -1;
             }
 
-            // Try FM demodulation with buffer validation
+            // FM demodulation
             if (!fmDemod.out.readBuf) {
-                flog::error("FM demod readBuf is null");
+                flog::error("FLEX DSP: FM demod output buffer is null");
                 return -1;
             }
 
@@ -63,9 +65,38 @@ public:
                 return count;
             }
 
-            // Simple copy from FM demod output to final output
+            // Simple DC removal using a high-pass filter approach
+            // This mimics the original multimon-ng DC offset removal
+            static float dcAccumulator = 0.0f;
+            const float dcAlpha = 16.0f / _samplerate;  // Equivalent to 16 Hz cutoff
+
+            // AGC processing with DC removal
+            if (!agc.out.readBuf) {
+                flog::error("FLEX DSP: AGC output buffer is null");
+                return -1;
+            }
+
+            // First pass: DC removal
             for (int i = 0; i < count; i++) {
-                base_type::out.writeBuf[i] = fmDemod.out.readBuf[i] * 0.1f;
+                float sample = fmDemod.out.readBuf[i];
+
+                // Simple DC removal (high-pass filter)
+                dcAccumulator = dcAccumulator * (1.0f - dcAlpha) + sample * dcAlpha;
+                float dcRemoved = sample - dcAccumulator;
+
+                // Store DC-removed sample for AGC processing
+                fmDemod.out.readBuf[i] = dcRemoved;
+            }
+
+            // AGC processing
+            count = agc.process(count, fmDemod.out.readBuf, agc.out.readBuf);
+            if (count <= 0) {
+                return count;
+            }
+
+            // Copy to output with appropriate scaling for FLEX decoder
+            for (int i = 0; i < count; i++) {
+                base_type::out.writeBuf[i] = agc.out.readBuf[i] * 0.1f;
             }
 
             // Flush input and swap output
@@ -78,7 +109,7 @@ public:
             return count;
 
         } catch (const std::exception& e) {
-            flog::error("Safer FM FLEX DSP run error: {}", e.what());
+            flog::error("FLEX DSP run error: {}", e.what());
             return -1;
         }
     }
@@ -93,6 +124,7 @@ public:
 
 private:
     dsp::demod::Quadrature fmDemod;
+    dsp::loop::FastAGC<float> agc;
     double _samplerate;
     bool initialized;
 };
