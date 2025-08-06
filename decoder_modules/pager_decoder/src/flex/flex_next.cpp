@@ -3,24 +3,67 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <cstdarg>  // For va_list, va_start, va_end
-#include <climits>    // For INT_MAX, UINT_MAX
-#include <cmath>      // For std::isfinite, std::clamp
-#include <algorithm>  // For std::clamp, std::min, std::max
+#include <cstdarg>   // For va_list, va_start, va_end
+#include <climits>   // For INT_MAX, UINT_MAX
+#include <cmath>     // For std::isfinite, std::clamp
+#include <algorithm> // For std::clamp, std::min, std::max
 #define __STDC_FORMAT_MACROS
-#include <inttypes.h>  // For PRId64 format specifier
+#include <inttypes.h> // For PRId64 format specifier
+#include <mutex>
 #include <utils/flog.h>
 
-// Logging function (replace multimon-ng's verbprintf)
+// Message storage for GUI display
+static std::vector<std::string> flexMessages;
+static std::mutex flexMessagesMutex;
+static const size_t MAX_MESSAGES = 1000; // Limit to prevent memory issues
+
+// Function to get messages for GUI display
+std::vector<std::string> getFlexMessages() {
+    std::lock_guard<std::mutex> lock(flexMessagesMutex);
+    return flexMessages;
+}
+
+// Function to clear messages
+void clearFlexMessages() {
+    std::lock_guard<std::mutex> lock(flexMessagesMutex);
+    flexMessages.clear();
+}
+
 static void verbprintf(int level, const char* format, ...) {
-    // Placeholder - in SDR++ you might want to use flog::debug, flog::info, etc.
-    if (level <= 2) {  // Only show important messages for now
-        va_list args;
-        va_start(args, format);
-        vprintf(format, args);
-        va_end(args);
+    va_list args;
+    va_start(args, format);
+
+    // Create the formatted message
+    char buffer[1024];
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+
+    // Keep existing console output
+    printf("FLEX[%d]: %s", level, buffer);
+
+    // Add to GUI message storage
+    {
+        std::lock_guard<std::mutex> lock(flexMessagesMutex);
+
+        // Create timestamped message
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
+        auto tm = *std::localtime(&time_t);
+
+        char timestamp[32];
+        strftime(timestamp, sizeof(timestamp), "[%H:%M:%S] ", &tm);
+
+        std::string fullMessage = std::string(timestamp) + "FLEX[" + std::to_string(level) + "]: " + buffer;
+
+        flexMessages.push_back(fullMessage);
+
+        // Limit message count to prevent memory issues
+        if (flexMessages.size() > MAX_MESSAGES) {
+            flexMessages.erase(flexMessages.begin());
+        }
     }
 }
+
 
 //=============================================================================
 // FLEX_NEW - Constructor Function
@@ -62,7 +105,7 @@ Flex_Next* Flex_New(unsigned int sampleFrequency) {
         flex->GroupHandler.GroupCycle[g] = -1;
     }
 
-	// Initialize state
+    // Initialize state
     flex->State.Current = FLEX_STATE_SYNC1;
     flex->State.Previous = FLEX_STATE_SYNC1;
 
@@ -79,7 +122,8 @@ FlexDecoderWrapper::FlexDecoderWrapper() : flex_state(nullptr) {
     flex_state = Flex_New(FREQ_SAMP);
     if (!flex_state) {
         flog::error("Failed to initialize FLEX decoder");
-    } else {
+    }
+    else {
         flog::info("FLEX decoder initialized successfully");
     }
 }
@@ -161,8 +205,8 @@ void Flex_Demodulate(Flex_Next* flex, double sample) {
 
         // Calculate current symbol rate
         flex->Modulation.symbol_rate = 1.0 * flex->Demodulator.symbol_count *
-                                      flex->Demodulator.sample_freq /
-                                      flex->Demodulator.sample_count;
+                                       flex->Demodulator.sample_freq /
+                                       flex->Demodulator.sample_count;
 
         // Determine the modal (most frequent) symbol from the 4 possible levels
         int decmax = 0;
@@ -278,8 +322,8 @@ static int buildSymbol(struct Flex_Next* flex, double sample) {
     sample = std::clamp(sample, -100.0, 100.0);
 
     // Calculate phase parameters for symbol timing
-    const int64_t phase_max = 100 * flex->Demodulator.sample_freq;  // Maximum value for phase
-    const int64_t phase_rate = phase_max * flex->Demodulator.baud / flex->Demodulator.sample_freq;  // Increment per sample
+    const int64_t phase_max = 100 * flex->Demodulator.sample_freq;                                 // Maximum value for phase
+    const int64_t phase_rate = phase_max * flex->Demodulator.baud / flex->Demodulator.sample_freq; // Increment per sample
 
     // Bounds check for phase
     if (flex->Demodulator.phase < 0) {
@@ -289,7 +333,7 @@ static int buildSymbol(struct Flex_Next* flex, double sample) {
         flex->Demodulator.phase = phase_max / 2;
     }
 
-    const double phasepercent = 100.0 * flex->Demodulator.phase / phase_max;  // Current phase as percentage
+    const double phasepercent = 100.0 * flex->Demodulator.phase / phase_max; // Current phase as percentage
 
     // Update the sample counter with overflow protection
     if (flex->Demodulator.sample_count < UINT_MAX) {
@@ -299,7 +343,7 @@ static int buildSymbol(struct Flex_Next* flex, double sample) {
     // Remove DC offset (FIR filter) - only during sync acquisition
     if (flex->State.Current == FLEX_STATE_SYNC1) {
         flex->Modulation.zero = (flex->Modulation.zero * (FREQ_SAMP * DC_OFFSET_FILTER) + sample) /
-                               ((FREQ_SAMP * DC_OFFSET_FILTER) + 1);
+                                ((FREQ_SAMP * DC_OFFSET_FILTER) + 1);
     }
     sample -= flex->Modulation.zero;
 
@@ -336,22 +380,24 @@ static int buildSymbol(struct Flex_Next* flex, double sample) {
         if (sample > 0) {
             if (sample > threshold) {
                 if (flex->Demodulator.symcount[3] < INT_MAX) {
-                    flex->Demodulator.symcount[3]++;  // Highest positive level
+                    flex->Demodulator.symcount[3]++; // Highest positive level
                 }
-            } else {
+            }
+            else {
                 if (flex->Demodulator.symcount[2] < INT_MAX) {
-                    flex->Demodulator.symcount[2]++;  // Lower positive level
+                    flex->Demodulator.symcount[2]++; // Lower positive level
                 }
             }
         }
         else {
             if (sample < -threshold) {
                 if (flex->Demodulator.symcount[0] < INT_MAX) {
-                    flex->Demodulator.symcount[0]++;  // Lowest negative level
+                    flex->Demodulator.symcount[0]++; // Lowest negative level
                 }
-            } else {
+            }
+            else {
                 if (flex->Demodulator.symcount[1] < INT_MAX) {
-                    flex->Demodulator.symcount[1]++;  // Higher negative level
+                    flex->Demodulator.symcount[1]++; // Higher negative level
                 }
             }
         }
@@ -405,9 +451,10 @@ static int buildSymbol(struct Flex_Next* flex, double sample) {
     // Check if we've completed a full symbol period
     if (flex->Demodulator.phase > phase_max) {
         flex->Demodulator.phase -= phase_max;
-        return 1;  // Symbol period complete - process the accumulated symbol data
-    } else {
-        return 0;  // Still accumulating samples for current symbol
+        return 1; // Symbol period complete - process the accumulated symbol data
+    }
+    else {
+        return 0; // Still accumulating samples for current symbol
     }
 }
 
@@ -419,101 +466,101 @@ static void flex_sym(struct Flex_Next* flex, unsigned char sym) {
     // Polarity is determined during the IDLE/sync word checking phase
     unsigned char sym_rectified;
     if (flex->Sync.polarity) {
-        sym_rectified = 3 - sym;  // Invert symbol for negative polarity
-    } else {
-        sym_rectified = sym;      // Use symbol as-is for positive polarity
+        sym_rectified = 3 - sym; // Invert symbol for negative polarity
+    }
+    else {
+        sym_rectified = sym; // Use symbol as-is for positive polarity
     }
 
     // FLEX State Machine - handles 4 main states
     switch (flex->State.Current) {
-        case FLEX_STATE_SYNC1:
-        {
-            // Continually compare the received symbol stream against known FLEX sync words
-            unsigned int sync_code = flex_sync(flex, sym); // Use unrectified symbol for sync detection
+    case FLEX_STATE_SYNC1: {
+        // Continually compare the received symbol stream against known FLEX sync words
+        unsigned int sync_code = flex_sync(flex, sym); // Use unrectified symbol for sync detection
 
-            if (sync_code != 0) {
-                // Valid sync word found - decode the transmission parameters
-                decode_mode(flex, sync_code);
+        if (sync_code != 0) {
+            // Valid sync word found - decode the transmission parameters
+            decode_mode(flex, sync_code);
 
-                if (flex->Sync.baud != 0 && flex->Sync.levels != 0) {
-                    // Valid mode detected - move to Frame Information Word state
-                    flex->State.Current = FLEX_STATE_FIW;
+            if (flex->Sync.baud != 0 && flex->Sync.levels != 0) {
+                // Valid mode detected - move to Frame Information Word state
+                flex->State.Current = FLEX_STATE_FIW;
 
-                    verbprintf(2, "FLEX_NEXT: SyncInfoWord: sync_code=0x%04x baud=%i levels=%i polarity=%s zero=%f envelope=%f symrate=%f\n",
-                        sync_code, flex->Sync.baud, flex->Sync.levels,
-                        flex->Sync.polarity ? "NEG" : "POS",
-                        flex->Modulation.zero, flex->Modulation.envelope, flex->Modulation.symbol_rate);
-                } else {
-                    verbprintf(2, "FLEX_NEXT: Unknown Sync code = 0x%04x\n", sync_code);
-                    flex->State.Current = FLEX_STATE_SYNC1;  // Stay in sync search
-                }
-            } else {
-                flex->State.Current = FLEX_STATE_SYNC1;  // Continue searching for sync
+                verbprintf(2, "FLEX_NEXT: SyncInfoWord: sync_code=0x%04x baud=%i levels=%i polarity=%s zero=%f envelope=%f symrate=%f\n",
+                           sync_code, flex->Sync.baud, flex->Sync.levels,
+                           flex->Sync.polarity ? "NEG" : "POS",
+                           flex->Modulation.zero, flex->Modulation.envelope, flex->Modulation.symbol_rate);
             }
-
-            // Initialize FIW processing
-            flex->State.fiwcount = 0;
-            flex->FIW.rawdata = 0;
-            break;
+            else {
+                verbprintf(2, "FLEX_NEXT: Unknown Sync code = 0x%04x\n", sync_code);
+                flex->State.Current = FLEX_STATE_SYNC1; // Stay in sync search
+            }
+        }
+        else {
+            flex->State.Current = FLEX_STATE_SYNC1; // Continue searching for sync
         }
 
-        case FLEX_STATE_FIW:
-        {
-            // Skip 16 bits of dotting, then accumulate 32 bits of Frame Information Word
-            // FIW contains frame timing and cycle information
-            flex->State.fiwcount++;
+        // Initialize FIW processing
+        flex->State.fiwcount = 0;
+        flex->FIW.rawdata = 0;
+        break;
+    }
 
-            if (flex->State.fiwcount >= 16) {
-                // After 16 bits of dotting, start collecting FIW data using 2FSK
-                read_2fsk(flex, sym_rectified, &flex->FIW.rawdata);
-            }
+    case FLEX_STATE_FIW: {
+        // Skip 16 bits of dotting, then accumulate 32 bits of Frame Information Word
+        // FIW contains frame timing and cycle information
+        flex->State.fiwcount++;
 
-            if (flex->State.fiwcount == 48) {
-                // Complete FIW received (16 bits dotting + 32 bits data)
-                if (decode_fiw(flex) == 0) {
-                    // FIW decoded successfully - move to second sync phase
-                    flex->State.sync2_count = 0;
-                    flex->Demodulator.baud = flex->Sync.baud;  // Switch to frame baud rate
-                    flex->State.Current = FLEX_STATE_SYNC2;
-                } else {
-                    // FIW decode failed - return to sync search
-                    flex->State.Current = FLEX_STATE_SYNC1;
-                }
-            }
-            break;
+        if (flex->State.fiwcount >= 16) {
+            // After 16 bits of dotting, start collecting FIW data using 2FSK
+            read_2fsk(flex, sym_rectified, &flex->FIW.rawdata);
         }
 
-        case FLEX_STATE_SYNC2:
-        {
-            // The second SYNC header is 25ms of idle bits at the frame baud rate
-            // Skip 25 ms = 40 bits @ 1600 bps, 80 bits @ 3200 bps
-            if (++flex->State.sync2_count == flex->Sync.baud * 25 / 1000) {
-                // Second sync period complete - prepare for data reception
-                flex->State.data_count = 0;
-                clear_phase_data(flex);  // Clear all phase buffers
-                flex->State.Current = FLEX_STATE_DATA;
+        if (flex->State.fiwcount == 48) {
+            // Complete FIW received (16 bits dotting + 32 bits data)
+            if (decode_fiw(flex) == 0) {
+                // FIW decoded successfully - move to second sync phase
+                flex->State.sync2_count = 0;
+                flex->Demodulator.baud = flex->Sync.baud; // Switch to frame baud rate
+                flex->State.Current = FLEX_STATE_SYNC2;
             }
-            break;
-        }
-
-        case FLEX_STATE_DATA:
-        {
-            // The data portion of the frame is 1760 ms long at either baudrate
-            // This is 2816 bits @ 1600 bps and 5632 bits @ 3200 bps
-            // Symbols are decoded and distributed to the four FLEX phases (A,B,C,D)
-            int idle = read_data(flex, sym_rectified);
-
-            if (++flex->State.data_count == flex->Sync.baud * 1760 / 1000 || idle) {
-                // Data section complete (time elapsed or all phases idle)
-                decode_data(flex);  // Process all received phase data
-
-                // Reset for next frame
-                flex->Demodulator.baud = 1600;  // Return to sync baud rate
+            else {
+                // FIW decode failed - return to sync search
                 flex->State.Current = FLEX_STATE_SYNC1;
-                flex->State.data_count = 0;
             }
-            break;
         }
+        break;
+    }
+
+    case FLEX_STATE_SYNC2: {
+        // The second SYNC header is 25ms of idle bits at the frame baud rate
+        // Skip 25 ms = 40 bits @ 1600 bps, 80 bits @ 3200 bps
+        if (++flex->State.sync2_count == flex->Sync.baud * 25 / 1000) {
+            // Second sync period complete - prepare for data reception
+            flex->State.data_count = 0;
+            clear_phase_data(flex); // Clear all phase buffers
+            flex->State.Current = FLEX_STATE_DATA;
+        }
+        break;
+    }
+
+    case FLEX_STATE_DATA: {
+        // The data portion of the frame is 1760 ms long at either baudrate
+        // This is 2816 bits @ 1600 bps and 5632 bits @ 3200 bps
+        // Symbols are decoded and distributed to the four FLEX phases (A,B,C,D)
+        int idle = read_data(flex, sym_rectified);
+
+        if (++flex->State.data_count == flex->Sync.baud * 1760 / 1000 || idle) {
+            // Data section complete (time elapsed or all phases idle)
+            decode_data(flex); // Process all received phase data
+
+            // Reset for next frame
+            flex->Demodulator.baud = 1600; // Return to sync baud rate
+            flex->State.Current = FLEX_STATE_SYNC1;
+            flex->State.data_count = 0;
+        }
+        break;
+    }
     }
 }
 
@@ -524,20 +571,20 @@ static void report_state(struct Flex_Next* flex) {
 
         const char* state = "Unknown";
         switch (flex->State.Current) {
-            case FLEX_STATE_SYNC1:
-                state = "SYNC1";
-                break;
-            case FLEX_STATE_FIW:
-                state = "FIW";
-                break;
-            case FLEX_STATE_SYNC2:
-                state = "SYNC2";
-                break;
-            case FLEX_STATE_DATA:
-                state = "DATA";
-                break;
-            default:
-                break;
+        case FLEX_STATE_SYNC1:
+            state = "SYNC1";
+            break;
+        case FLEX_STATE_FIW:
+            state = "FIW";
+            break;
+        case FLEX_STATE_SYNC2:
+            state = "SYNC2";
+            break;
+        case FLEX_STATE_DATA:
+            state = "DATA";
+            break;
+        default:
+            break;
         }
         verbprintf(1, "FLEX_NEXT: State: %s\n", state);
     }
@@ -579,9 +626,9 @@ static unsigned int flex_sync_check(struct Flex_Next* flex, uint64_t buf) {
     // First we match on the marker field with a hamming distance < 4
     // Then we match on the outer code with a hamming distance < 4
 
-    unsigned int marker =     (buf & 0x0000FFFFFFFF0000ULL) >> 16;  // Extract middle 32 bits
-    unsigned short codehigh = (buf & 0xFFFF000000000000ULL) >> 48;  // Extract upper 16 bits
-    unsigned short codelow  = ~(buf & 0x000000000000FFFFULL);       // Extract lower 16 bits (inverted)
+    unsigned int marker = (buf & 0x0000FFFFFFFF0000ULL) >> 16;     // Extract middle 32 bits
+    unsigned short codehigh = (buf & 0xFFFF000000000000ULL) >> 48; // Extract upper 16 bits
+    unsigned short codelow = ~(buf & 0x000000000000FFFFULL);       // Extract lower 16 bits (inverted)
 
     int retval = 0;
 
@@ -589,9 +636,10 @@ static unsigned int flex_sync_check(struct Flex_Next* flex, uint64_t buf) {
     // AND if the outer code (codehigh XOR codelow inverted) has less than 4 bit errors
     if (count_bits(flex, marker ^ FLEX_SYNC_MARKER) < 4 &&
         count_bits(flex, codelow ^ codehigh) < 4) {
-        retval = codehigh;  // Return the sync code identifier
-    } else {
-        retval = 0;         // No valid sync pattern found
+        retval = codehigh; // Return the sync code identifier
+    }
+    else {
+        retval = 0; // No valid sync pattern found
     }
 
     return retval;
@@ -610,16 +658,17 @@ static unsigned int flex_sync(struct Flex_Next* flex, unsigned char sym) {
     // Check for positive (normal) polarity sync pattern
     retval = flex_sync_check(flex, flex->Sync.syncbuf);
     if (retval != 0) {
-        flex->Sync.polarity = 0;  // Normal polarity detected
-    } else {
+        flex->Sync.polarity = 0; // Normal polarity detected
+    }
+    else {
         // If positive sync pattern was not found, look for negative (inverted) polarity
         retval = flex_sync_check(flex, ~flex->Sync.syncbuf);
         if (retval != 0) {
-            flex->Sync.polarity = 1;  // Inverted polarity detected
+            flex->Sync.polarity = 1; // Inverted polarity detected
         }
     }
 
-    return retval;  // Return sync code (0 if no sync found)
+    return retval; // Return sync code (0 if no sync found)
 }
 
 // FLEX Mode Decoding - Determines baud rate and FSK levels from sync code
@@ -636,12 +685,12 @@ static void decode_mode(struct Flex_Next* flex, unsigned int sync_code) {
         unsigned int baud;   // Baud rate (1600, 3200, 6400)
         unsigned int levels; // FSK levels (2 or 4)
     } flex_modes[] = {
-        { 0x870C, 1600, 2 },  // 1600 baud, 2-level FSK
-        { 0xB068, 1600, 4 },  // 1600 baud, 4-level FSK
-        { 0x7B18, 3200, 2 },  // 3200 baud, 2-level FSK
-        { 0xDEA0, 3200, 4 },  // 3200 baud, 4-level FSK
-        { 0x4C7C, 3200, 4 },  // 3200 baud, 4-level FSK (alternate)
-        { 0, 0, 0 }           // Terminator
+        { 0x870C, 1600, 2 }, // 1600 baud, 2-level FSK
+        { 0xB068, 1600, 4 }, // 1600 baud, 4-level FSK
+        { 0x7B18, 3200, 2 }, // 3200 baud, 2-level FSK
+        { 0xDEA0, 3200, 4 }, // 3200 baud, 4-level FSK
+        { 0x4C7C, 3200, 4 }, // 3200 baud, 4-level FSK (alternate)
+        { 0, 0, 0 }          // Terminator
     };
 
     bool mode_found = false;
@@ -657,7 +706,7 @@ static void decode_mode(struct Flex_Next* flex, unsigned int sync_code) {
             mode_found = true;
 
             verbprintf(2, "FLEX_NEXT: Mode detected - %u baud, %u-level FSK\n",
-                      flex->Sync.baud, flex->Sync.levels);
+                       flex->Sync.baud, flex->Sync.levels);
             break;
         }
     }
@@ -666,8 +715,8 @@ static void decode_mode(struct Flex_Next* flex, unsigned int sync_code) {
     if (!mode_found) {
         verbprintf(3, "FLEX_NEXT: Sync Code 0x%04x not found, defaulting to 1600bps 2FSK\n", sync_code);
         flex->Sync.sync = sync_code;
-        flex->Sync.baud = 1600;    // Default baud rate
-        flex->Sync.levels = 2;     // Default to 2-level FSK
+        flex->Sync.baud = 1600; // Default baud rate
+        flex->Sync.levels = 2;  // Default to 2-level FSK
     }
 }
 
@@ -712,13 +761,14 @@ static int bch3121_fix_errors(struct Flex_Next* flex, uint32_t* data_to_fix, cha
         int fixed = count_bits(flex, (*data_to_fix & 0x7FFFFFFF) ^ data);
         if (fixed > 0) {
             verbprintf(3, "FLEX_NEXT: Phase %c Fixed %i errors @ 0x%08x  (0x%08x -> 0x%08x)\n",
-                      PhaseNo, fixed, (*data_to_fix & 0x7FFFFFFF) ^ data,
-                      (*data_to_fix & 0x7FFFFFFF), data);
+                       PhaseNo, fixed, (*data_to_fix & 0x7FFFFFFF) ^ data,
+                       (*data_to_fix & 0x7FFFFFFF), data);
         }
 
         // Write the fixed data back to the caller
         *data_to_fix = data;
-    } else {
+    }
+    else {
         verbprintf(3, "FLEX_NEXT: Phase %c Data corruption - Unable to fix errors.\n", PhaseNo);
     }
 
@@ -741,28 +791,28 @@ static int decode_fiw(struct Flex_Next* flex) {
 
     // Extract fields from the corrected FIW
     // The only relevant bits in the FIW word are those masked by 0x001FFFFF
-    flex->FIW.checksum = fiw & 0xF;           // Bits 0-3: Checksum
-    flex->FIW.cycleno = (fiw >> 4) & 0xF;     // Bits 4-7: Cycle number (0-15)
-    flex->FIW.frameno = (fiw >> 8) & 0x7F;    // Bits 8-14: Frame number (0-127)
-    flex->FIW.fix3 = (fiw >> 15) & 0x3F;      // Bits 15-20: Reserved field
+    flex->FIW.checksum = fiw & 0xF;        // Bits 0-3: Checksum
+    flex->FIW.cycleno = (fiw >> 4) & 0xF;  // Bits 4-7: Cycle number (0-15)
+    flex->FIW.frameno = (fiw >> 8) & 0x7F; // Bits 8-14: Frame number (0-127)
+    flex->FIW.fix3 = (fiw >> 15) & 0x3F;   // Bits 15-20: Reserved field
 
     // Calculate and verify checksum
-    unsigned int checksum = (fiw & 0xF);         // Bits 0-3
-    checksum += ((fiw >> 4) & 0xF);              // Bits 4-7
-    checksum += ((fiw >> 8) & 0xF);              // Bits 8-11
-    checksum += ((fiw >> 12) & 0xF);             // Bits 12-15
-    checksum += ((fiw >> 16) & 0xF);             // Bits 16-19
-    checksum += ((fiw >> 20) & 0x01);            // Bit 20
+    unsigned int checksum = (fiw & 0xF); // Bits 0-3
+    checksum += ((fiw >> 4) & 0xF);      // Bits 4-7
+    checksum += ((fiw >> 8) & 0xF);      // Bits 8-11
+    checksum += ((fiw >> 12) & 0xF);     // Bits 12-15
+    checksum += ((fiw >> 16) & 0xF);     // Bits 16-19
+    checksum += ((fiw >> 20) & 0x01);    // Bit 20
 
-    checksum &= 0xF;  // Keep only lower 4 bits
+    checksum &= 0xF; // Keep only lower 4 bits
 
     if (checksum == 0xF) {
         // Checksum is valid - calculate and display timing information
         int timeseconds = flex->FIW.cycleno * 4 * 60 + flex->FIW.frameno * 4 * 60 / 128;
 
         verbprintf(2, "FLEX_NEXT: FrameInfoWord: cycleno=%02i frameno=%03i fix3=0x%02x time=%02i:%02i\n",
-                  flex->FIW.cycleno, flex->FIW.frameno, flex->FIW.fix3,
-                  timeseconds / 60, timeseconds % 60);
+                   flex->FIW.cycleno, flex->FIW.frameno, flex->FIW.fix3,
+                   timeseconds / 60, timeseconds % 60);
 
         // Check for missed group messages and clean up if necessary
         for (int g = 0; g < GROUP_BITS; g++) {
@@ -771,8 +821,8 @@ static int decode_fiw(struct Flex_Next* flex) {
                 int Reset = 0;
 
                 verbprintf(4, "FLEX_NEXT: GroupBit %i, FrameNo: %i, Cycle No: %i target Cycle No: %i\n",
-                          g, flex->GroupHandler.GroupFrame[g], flex->GroupHandler.GroupCycle[g],
-                          (int)flex->FIW.cycleno);
+                           g, flex->GroupHandler.GroupFrame[g], flex->GroupHandler.GroupCycle[g],
+                           (int)flex->FIW.cycleno);
 
                 // Check if message was expected in this frame
                 if ((int)flex->FIW.cycleno == flex->GroupHandler.GroupCycle[g]) {
@@ -801,14 +851,15 @@ static int decode_fiw(struct Flex_Next* flex) {
 
                     if (REPORT_GROUP_CODES > 0) {
                         verbprintf(3, "FLEX_NEXT: Group messages seem to have been missed; Groupbit: %i; Total Capcodes: %i; Clearing Data; Capcodes: ",
-                                  g, endpoint);
+                                   g, endpoint);
                     }
 
                     for (int capIndex = 1; capIndex <= endpoint; capIndex++) {
                         if (REPORT_GROUP_CODES == 0) {
                             verbprintf(3, "FLEX_NEXT: Group messages seem to have been missed; Groupbit: %i; Clearing data; Capcode: [%010" PRId64 "]\n",
-                                      g, flex->GroupHandler.GroupCodes[g][capIndex]);
-                        } else {
+                                       g, flex->GroupHandler.GroupCodes[g][capIndex]);
+                        }
+                        else {
                             if (capIndex > 1) {
                                 verbprintf(3, ",");
                             }
@@ -828,10 +879,11 @@ static int decode_fiw(struct Flex_Next* flex) {
             }
         }
 
-        return 0;  // Success
-    } else {
+        return 0; // Success
+    }
+    else {
         verbprintf(3, "FLEX_NEXT: Bad Checksum 0x%x\n", checksum);
-        return 1;  // Checksum failure
+        return 1; // Checksum failure
     }
 }
 
@@ -854,8 +906,8 @@ static void clear_phase_data(struct Flex_Next* flex) {
     flex->Data.PhaseD.idle_count = 0;
 
     // Reset data collection state
-    flex->Data.phase_toggle = 0;        // Start with first phase pair (A/B)
-    flex->Data.data_bit_counter = 0;    // Reset bit position counter
+    flex->Data.phase_toggle = 0;     // Start with first phase pair (A/B)
+    flex->Data.data_bit_counter = 0; // Reset bit position counter
 
     verbprintf(3, "FLEX_NEXT: Phase data buffers cleared and initialized\n");
 }
@@ -889,8 +941,8 @@ static int read_data(struct Flex_Next* flex, unsigned char sym) {
     // then PHASE C (and PHASE D if 4-level) are decoded on the next.
 
     // Convert FSK symbol to phase bits
-    int bit_a = 0;  // Received data bit for Phase A
-    int bit_b = 0;  // Received data bit for Phase B
+    int bit_a = 0; // Received data bit for Phase A
+    int bit_b = 0; // Received data bit for Phase B
 
     // Phase A: symbols 0,1 -> 1, symbols 2,3 -> 0
     bit_a = (sym > 1);
@@ -931,7 +983,8 @@ static int read_data(struct Flex_Next* flex, unsigned char sym) {
                 flex->Data.PhaseB.idle_count++;
             }
         }
-    } else {
+    }
+    else {
         // Process Phase C and Phase D
         flex->Data.PhaseC.buf[idx] = (flex->Data.PhaseC.buf[idx] >> 1) |
                                      (bit_a ? 0x80000000 : 0);
@@ -964,18 +1017,21 @@ static int read_data(struct Flex_Next* flex, unsigned char sym) {
         if (flex->Sync.levels == 2) {
             // 1600 baud, 2-level: only Phase A is active
             idle = (flex->Data.PhaseA.idle_count > IDLE_THRESHOLD);
-        } else {
+        }
+        else {
             // 1600 baud, 4-level: Phase A and Phase B are active
             idle = ((flex->Data.PhaseA.idle_count > IDLE_THRESHOLD) &&
                     (flex->Data.PhaseB.idle_count > IDLE_THRESHOLD));
         }
-    } else {
+    }
+    else {
         // 3200 baud
         if (flex->Sync.levels == 2) {
             // 3200 baud, 2-level: Phase A and Phase C are active
             idle = ((flex->Data.PhaseA.idle_count > IDLE_THRESHOLD) &&
                     (flex->Data.PhaseC.idle_count > IDLE_THRESHOLD));
-        } else {
+        }
+        else {
             // 3200 baud, 4-level: all phases are active
             idle = ((flex->Data.PhaseA.idle_count > IDLE_THRESHOLD) &&
                     (flex->Data.PhaseB.idle_count > IDLE_THRESHOLD) &&
@@ -984,7 +1040,7 @@ static int read_data(struct Flex_Next* flex, unsigned char sym) {
         }
     }
 
-    return idle;  // Return 1 if all active phases are idle, 0 otherwise
+    return idle; // Return 1 if all active phases are idle, 0 otherwise
 }
 
 // FLEX Data Decoding - Process all collected phase data
@@ -992,25 +1048,28 @@ static void decode_data(struct Flex_Next* flex) {
     if (flex == nullptr) return;
 
     verbprintf(2, "FLEX_NEXT: Decoding data for %u baud, %u-level FSK\n",
-              flex->Sync.baud, flex->Sync.levels);
+               flex->Sync.baud, flex->Sync.levels);
 
     // Process phases based on transmission mode
     if (flex->Sync.baud == 1600) {
         if (flex->Sync.levels == 2) {
             // 1600 baud, 2-level FSK: Only Phase A is used
             decode_phase(flex, 'A');
-        } else {
+        }
+        else {
             // 1600 baud, 4-level FSK: Phase A and Phase B are used
             decode_phase(flex, 'A');
             decode_phase(flex, 'B');
         }
-    } else {
+    }
+    else {
         // 3200 baud modes
         if (flex->Sync.levels == 2) {
             // 3200 baud, 2-level FSK: Phase A and Phase C are used (interleaved)
             decode_phase(flex, 'A');
             decode_phase(flex, 'C');
-        } else {
+        }
+        else {
             // 3200 baud, 4-level FSK: All phases are used
             decode_phase(flex, 'A');
             decode_phase(flex, 'B');
@@ -1035,13 +1094,21 @@ static void decode_phase(struct Flex_Next* flex, char PhaseNo) {
 
     // Select the appropriate phase buffer based on phase number
     switch (PhaseNo) {
-        case 'A': phaseptr = flex->Data.PhaseA.buf; break;
-        case 'B': phaseptr = flex->Data.PhaseB.buf; break;
-        case 'C': phaseptr = flex->Data.PhaseC.buf; break;
-        case 'D': phaseptr = flex->Data.PhaseD.buf; break;
-        default:
-            verbprintf(2, "FLEX_NEXT: Invalid phase number %c\n", PhaseNo);
-            return;
+    case 'A':
+        phaseptr = flex->Data.PhaseA.buf;
+        break;
+    case 'B':
+        phaseptr = flex->Data.PhaseB.buf;
+        break;
+    case 'C':
+        phaseptr = flex->Data.PhaseC.buf;
+        break;
+    case 'D':
+        phaseptr = flex->Data.PhaseD.buf;
+        break;
+    default:
+        verbprintf(2, "FLEX_NEXT: Invalid phase number %c\n", PhaseNo);
+        return;
     }
 
     // Apply BCH error correction to each data word in the phase buffer
@@ -1082,7 +1149,7 @@ static void decode_phase(struct Flex_Next* flex, char PhaseNo) {
 
     // Long addresses use double AW and VW, so there are anywhere between ceil(v-a/2) to v-a pages in this frame
     verbprintf(2, "FLEX_NEXT: BlockInfoWord: (Phase %c) BIW:%08X AW %02u VW %02u (up to %u pages)\n",
-              PhaseNo, biw, aoffset, voffset, voffset - aoffset);
+               PhaseNo, biw, aoffset, voffset, voffset - aoffset);
 
     int flex_groupmessage = 0;
     int flex_groupbit = 0;
@@ -1090,7 +1157,7 @@ static void decode_phase(struct Flex_Next* flex, char PhaseNo) {
     // Iterate through pages and dispatch to appropriate handler
     for (unsigned int i = aoffset; i < voffset; i++) {
         verbprintf(2, "FLEX_NEXT: Processing page offset #%u AW:%08X VW:%08X\n",
-                  i - aoffset + 1, phaseptr[i], phaseptr[voffset + i - aoffset]);
+                   i - aoffset + 1, phaseptr[i], phaseptr[voffset + i - aoffset]);
 
         // Check for idle/invalid address words
         if (phaseptr[i] == 0 || (phaseptr[i] & 0x1FFFFF) == 0x1FFFFF) {
@@ -1105,11 +1172,11 @@ static void decode_phase(struct Flex_Next* flex, char PhaseNo) {
 
         // Determine if this is a long address based on specific ranges
         flex->Decode.long_address = (aiw < 0x8001L) ||
-                                   (aiw > 0x1E0000L && aiw < 0x1F0001L) ||
-                                   (aiw > 0x1F7FFEL);
+                                    (aiw > 0x1E0000L && aiw < 0x1F0001L) ||
+                                    (aiw > 0x1F7FFEL);
 
         // Calculate capcode based on address type
-        flex->Decode.capcode = aiw - 0x8000L;  // Short address calculation
+        flex->Decode.capcode = aiw - 0x8000L; // Short address calculation
         if (flex->Decode.long_address) {
             // Long address calculation - couldn't find spec on this, credit to PDW
             flex->Decode.capcode = phaseptr[i + 1] ^ 0x1FFFFFL;
@@ -1145,13 +1212,13 @@ static void decode_phase(struct Flex_Next* flex, char PhaseNo) {
         }
 
         verbprintf(2, "FLEX_NEXT: AIW %u: capcode:%" PRId64 " long:%d group:%d groupbit:%d\n",
-                  i, flex->Decode.capcode, flex->Decode.long_address, flex_groupmessage, flex_groupbit);
+                   i, flex->Decode.capcode, flex->Decode.long_address, flex_groupmessage, flex_groupbit);
 
         /*********************
          * Parse Vector Information Word (VW)
          */
         // Parse vector information word for address @ offset 'i'
-        unsigned int j = voffset + i - aoffset;    // Start of vector field for address @ i
+        unsigned int j = voffset + i - aoffset; // Start of vector field for address @ i
         uint32_t viw = phaseptr[j];
 
         // Extract VIW fields
@@ -1167,7 +1234,8 @@ static void decode_phase(struct Flex_Next* flex, char PhaseNo) {
                 // Per PDW
                 len--;
             }
-        } else {  // Short address
+        }
+        else { // Short address
             // The header is within the message
             hdr = mw1;
             mw1++;
@@ -1184,23 +1252,23 @@ static void decode_phase(struct Flex_Next* flex, char PhaseNo) {
 
         // Get message fragment number (bits 11 and 12) from first header word
         // If frag != 3 then this is a continued message
-        int frag = (int) (phaseptr[hdr] >> 11) & 0x3L;
+        int frag = (int)(phaseptr[hdr] >> 11) & 0x3L;
         // Which spec documents a cont flag? It is used to derive the K/F/C frag_flag
-        int cont = (int) (phaseptr[hdr] >> 10) & 0x1L;
+        int cont = (int)(phaseptr[hdr] >> 10) & 0x1L;
 
         verbprintf(2, "FLEX_NEXT: VIW %u: type:%d mw1:%u len:%u frag:%i\n",
-                  j, flex->Decode.type, mw1, len, frag);
+                   j, flex->Decode.type, mw1, len, frag);
 
         // Handle Short Instruction messages (group messaging setup)
         if (flex->Decode.type == FLEX_PAGETYPE_SHORT_INSTRUCTION) {
-            unsigned int iAssignedFrame = (int)((viw >> 10) & 0x7f);  // Frame with groupmessage
-            int groupbit = (int)((viw >> 17) & 0x7f);    // Listen to this groupcode
+            unsigned int iAssignedFrame = (int)((viw >> 10) & 0x7f); // Frame with groupmessage
+            int groupbit = (int)((viw >> 17) & 0x7f);                // Listen to this groupcode
 
             // Add capcode to group handler
             flex->GroupHandler.GroupCodes[groupbit][CAPCODES_INDEX]++;
             int CapcodePlacement = flex->GroupHandler.GroupCodes[groupbit][CAPCODES_INDEX];
             verbprintf(1, "FLEX_NEXT: Found Short Instruction, Group bit: %i capcodes in group so far %i, adding Capcode: [%010" PRId64 "]\n",
-                      groupbit, CapcodePlacement, flex->Decode.capcode);
+                       groupbit, CapcodePlacement, flex->Decode.capcode);
 
             flex->GroupHandler.GroupCodes[groupbit][CapcodePlacement] = flex->Decode.capcode;
             flex->GroupHandler.GroupFrame[groupbit] = iAssignedFrame;
@@ -1209,10 +1277,12 @@ static void decode_phase(struct Flex_Next* flex, char PhaseNo) {
             if (iAssignedFrame > flex->FIW.frameno) {
                 flex->GroupHandler.GroupCycle[groupbit] = (int)flex->FIW.cycleno;
                 verbprintf(2, "FLEX_NEXT: Message frame is in this cycle: %i\n", flex->GroupHandler.GroupCycle[groupbit]);
-            } else {
+            }
+            else {
                 if (flex->FIW.cycleno == 15) {
                     flex->GroupHandler.GroupCycle[groupbit] = 0;
-                } else {
+                }
+                else {
                     flex->GroupHandler.GroupCycle[groupbit] = (int)flex->FIW.cycleno++;
                 }
                 verbprintf(2, "FLEX_NEXT: Message frame is in the next cycle: %i\n", flex->GroupHandler.GroupCycle[groupbit]);
@@ -1240,9 +1310,9 @@ static void decode_phase(struct Flex_Next* flex, char PhaseNo) {
 
         // Output message header information
         verbprintf(0, "FLEX_NEXT|%i/%i|%02i.%03i.%c|%010" PRId64 "|%c%c|%1d|",
-                  flex->Sync.baud, flex->Sync.levels, flex->FIW.cycleno, flex->FIW.frameno, PhaseNo,
-                  flex->Decode.capcode, (flex->Decode.long_address ? 'L' : 'S'),
-                  (flex_groupmessage ? 'G' : 'S'), flex->Decode.type);
+                   flex->Sync.baud, flex->Sync.levels, flex->FIW.cycleno, flex->FIW.frameno, PhaseNo,
+                   flex->Decode.capcode, (flex->Decode.long_address ? 'L' : 'S'),
+                   (flex_groupmessage ? 'G' : 'S'), flex->Decode.type);
 
         // Dispatch to appropriate message parser based on page type
         if (is_alphanumeric_page(flex)) {
@@ -1263,7 +1333,7 @@ static void decode_phase(struct Flex_Next* flex, char PhaseNo) {
         }
         else {
             verbprintf(0, "UNK|");
-            parse_binary(flex, phaseptr, mw1, len);  // Default to binary output for unknown types
+            parse_binary(flex, phaseptr, mw1, len); // Default to binary output for unknown types
         }
 
         verbprintf(0, "\n");
@@ -1323,17 +1393,17 @@ static unsigned int add_ch(unsigned char ch, unsigned char* buf, unsigned int id
     }
 
     // Handle special characters that need escaping
-    if (ch == 0x09 && idx < (MAX_ALN - 2)) {  // '\t' (tab)
+    if (ch == 0x09 && idx < (MAX_ALN - 2)) { // '\t' (tab)
         buf[idx] = '\\';
         buf[idx + 1] = 't';
         return 2;
     }
-    if (ch == 0x0a && idx < (MAX_ALN - 2)) {  // '\n' (newline)
+    if (ch == 0x0a && idx < (MAX_ALN - 2)) { // '\n' (newline)
         buf[idx] = '\\';
         buf[idx + 1] = 'n';
         return 2;
     }
-    if (ch == 0x0d && idx < (MAX_ALN - 2)) {  // '\r' (carriage return)
+    if (ch == 0x0d && idx < (MAX_ALN - 2)) { // '\r' (carriage return)
         buf[idx] = '\\';
         buf[idx + 1] = 'r';
         return 2;
@@ -1361,14 +1431,14 @@ static unsigned int add_ch(unsigned char ch, unsigned char* buf, unsigned int id
 
 // Parse alphanumeric messages (including group messages)
 static void parse_alphanumeric(struct Flex_Next* flex, unsigned int* phaseptr, unsigned int mw1,
-                              unsigned int len, int frag, int cont, int flex_groupmessage, int flex_groupbit) {
+                               unsigned int len, int frag, int cont, int flex_groupmessage, int flex_groupbit) {
     if (flex == nullptr) return;
 
     // Determine fragment flag based on frag and cont values
     char frag_flag = '?';
     if (cont == 0 && frag == 3) frag_flag = 'K'; // complete, ready to send
     if (cont == 0 && frag != 3) frag_flag = 'C'; // incomplete until appended to 1 or more 'F's
-    if (cont == 1             ) frag_flag = 'F'; // incomplete until a 'C' fragment is appended
+    if (cont == 1) frag_flag = 'F';              // incomplete until a 'C' fragment is appended
 
     verbprintf(0, "%1d.%1d.%c|", frag, cont, frag_flag);
 
@@ -1398,7 +1468,7 @@ static void parse_alphanumeric(struct Flex_Next* flex, unsigned int* phaseptr, u
         // Output all capcodes in this group
         for (int g = 1; g <= endpoint; g++) {
             verbprintf(1, "FLEX Group message output: Groupbit: %i Total Capcodes; %i; index %i; Capcode: [%010" PRId64 "]\n",
-                      flex_groupbit, endpoint, g, flex->GroupHandler.GroupCodes[flex_groupbit][g]);
+                       flex_groupbit, endpoint, g, flex->GroupHandler.GroupCodes[flex_groupbit][g]);
             verbprintf(0, "%010" PRId64 "|", flex->GroupHandler.GroupCodes[flex_groupbit][g]);
         }
 
@@ -1423,7 +1493,7 @@ static void parse_numeric(struct Flex_Next* flex, unsigned int* phaseptr, int j)
     int w1 = phaseptr[j] >> 7;
     int w2 = w1 >> 7;
     w1 = w1 & 0x7f;
-    w2 = (w2 & 0x07) + w1;  // numeric message is 7 words max
+    w2 = (w2 & 0x07) + w1; // numeric message is 7 words max
 
     // Get first dataword from message field or from second vector word if long address
     int dw;
@@ -1431,7 +1501,8 @@ static void parse_numeric(struct Flex_Next* flex, unsigned int* phaseptr, int j)
         dw = phaseptr[w1];
         w1++;
         w2++;
-    } else {
+    }
+    else {
         dw = phaseptr[j + 1];
     }
 
@@ -1440,9 +1511,10 @@ static void parse_numeric(struct Flex_Next* flex, unsigned int* phaseptr, int j)
 
     // Skip header bits based on message type
     if (flex->Decode.type == FLEX_PAGETYPE_NUMBERED_NUMERIC) {
-        count += 10;        // Skip 10 header bits for numbered numeric pages
-    } else {
-        count += 2;         // Otherwise skip 2
+        count += 10; // Skip 10 header bits for numbered numeric pages
+    }
+    else {
+        count += 2; // Otherwise skip 2
     }
 
     // Process each data word

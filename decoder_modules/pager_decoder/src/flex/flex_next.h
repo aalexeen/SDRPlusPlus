@@ -6,27 +6,37 @@
 #include <cstdio>
 #include <functional>
 #include <string>
+#include <vector>
+#include <mutex>
+#include <chrono>
+#include <ctime>
+
 
 // All the #defines from original multimon-ng
-#define FREQ_SAMP            22050
-#define FILTLEN              1
-#define REPORT_GROUP_CODES   1       // Report each cleared faulty group capcode : 0 = Each on a new line; 1 = All on the same line;
+#define FREQ_SAMP          22050
+#define FILTLEN            1
+#define REPORT_GROUP_CODES 1 // Report each cleared faulty group capcode : 0 = Each on a new line; 1 = All on the same line;
 
-#define FLEX_SYNC_MARKER     0xA6C6AAAAul  // Synchronisation code marker for FLEX
-#define SLICE_THRESHOLD      0.667         // For 4 level code, levels 0 and 3 have 3 times the amplitude of levels 1 and 2, so quantise at 2/3
-#define DC_OFFSET_FILTER     0.010         // DC Offset removal IIR filter response (seconds)
-#define PHASE_LOCKED_RATE    0.045         // Correction factor for locked state
-#define PHASE_UNLOCKED_RATE  0.050         // Correction factor for unlocked state
-#define LOCK_LEN             24            // Number of symbols to check for phase locking (max 32)
-#define IDLE_THRESHOLD       0             // Number of idle codewords allowed in data section
-#define CAPCODES_INDEX       0
-#define DEMOD_TIMEOUT        100           // Maximum number of periods with no zero crossings before we decide that the system is not longer within a Timing lock.
-#define GROUP_BITS           17            // Centralized maximum of group msg cache
-#define PHASE_WORDS          88            // per spec, there are 88 4B words per frame
-#define MAX_ALN              512           // max possible ALN characters
+#define FLEX_SYNC_MARKER    0xA6C6AAAAul // Synchronisation code marker for FLEX
+#define SLICE_THRESHOLD     0.667        // For 4 level code, levels 0 and 3 have 3 times the amplitude of levels 1 and 2, so quantise at 2/3
+#define DC_OFFSET_FILTER    0.010        // DC Offset removal IIR filter response (seconds)
+#define PHASE_LOCKED_RATE   0.045        // Correction factor for locked state
+#define PHASE_UNLOCKED_RATE 0.050        // Correction factor for unlocked state
+#define LOCK_LEN            24           // Number of symbols to check for phase locking (max 32)
+#define IDLE_THRESHOLD      0            // Number of idle codewords allowed in data section
+#define CAPCODES_INDEX      0
+#define DEMOD_TIMEOUT       100 // Maximum number of periods with no zero crossings before we decide that the system is not longer within a Timing lock.
+#define GROUP_BITS          17  // Centralized maximum of group msg cache
+#define PHASE_WORDS         88  // per spec, there are 88 4B words per frame
+#define MAX_ALN             512 // max possible ALN characters
 
 // Forward declaration for BCH error correction
 struct BCHCode;
+
+// Function declarations for GUI message access
+std::vector<std::string> getFlexMessages();
+void clearFlexMessages();
+
 
 // FLEX Page Type Enumeration
 enum Flex_PageTypeEnum {
@@ -62,7 +72,7 @@ struct Flex_Demodulator {
     int symcount[4];
     int timeout;
     int nonconsec;
-    unsigned int baud;          // Current baud rate
+    unsigned int baud; // Current baud rate
 };
 
 // FLEX Group Message Handler Structure
@@ -90,10 +100,10 @@ struct Flex_State {
 
 // FLEX Synchronization Structure
 struct Flex_Sync {
-    unsigned int sync;          // Outer synchronization code
-    unsigned int baud;          // Baudrate of SYNC2 and DATA
-    unsigned int levels;        // FSK encoding of SYNC2 and DATA
-    unsigned int polarity;      // 0=Positive (Normal) 1=Negative (Inverted)
+    unsigned int sync;     // Outer synchronization code
+    unsigned int baud;     // Baudrate of SYNC2 and DATA
+    unsigned int levels;   // FSK encoding of SYNC2 and DATA
+    unsigned int polarity; // 0=Positive (Normal) 1=Negative (Inverted)
     uint64_t syncbuf;
 };
 
@@ -210,7 +220,7 @@ public:
 
 private:
     // Your actual C struct/data from converted flex_next code
-    void* flex_state;  // Points to your converted Flex_Next struct
+    void* flex_state; // Points to your converted Flex_Next struct
     std::function<void(int64_t, int, const std::string&)> messageCallback;
 
     // Static callback bridge for C code

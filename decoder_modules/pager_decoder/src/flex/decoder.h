@@ -7,9 +7,9 @@
 #include <dsp/sink/handler_sink.h>
 #include <utils/flog.h>
 #include <memory>
-#include "dsp.h"           // Local FLEX DSP header
-#include "flex_next.h"     // FlexDecoderWrapper
-#include "../BCHCode.h"    // BCH error correction (up one directory)
+#include "dsp.h"        // Local FLEX DSP header
+#include "flex_next.h"  // FlexDecoderWrapper
+#include "../BCHCode.h" // BCH error correction (up one directory)
 
 class FLEXDecoder : public Decoder {
 public:
@@ -20,7 +20,7 @@ public:
             vfo->setSampleRate(PAGER_AUDIO_SAMPLERATE, 25000);
 
             // Initialize DSP chain with validation
-            dsp.init(vfo->output, 24000);  // Use fixed sample rate
+            dsp.init(vfo->output, 24000); // Use fixed sample rate
 
             if (!dsp.isInitialized()) {
                 throw std::runtime_error("Failed to initialize FLEX DSP");
@@ -34,7 +34,8 @@ public:
 
             initialized = true;
             flog::info("FLEX decoder created successfully");
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Failed to create FLEX decoder: {}", e.what());
             initialized = false;
         }
@@ -58,9 +59,15 @@ public:
         // Add FLEX-specific controls
         ImGui::Checkbox("Show Raw Data", &showRawData);
         ImGui::Checkbox("Show Errors", &showErrors);
+        // New: Message window toggle
+        ImGui::Checkbox("Show Message Window", &showMessageWindow);
 
         if (ImGui::Button("Reset Decoder")) {
             resetDecoder();
+        }
+        // Message window display
+        if (showMessageWindow) {
+            showFlexMessageWindow();
         }
     }
 
@@ -76,7 +83,8 @@ public:
             vfo->setSampleRate(PAGER_AUDIO_SAMPLERATE, 25000);
             dsp.setInput(vfo->output);
             flog::info("FLEX decoder VFO set successfully");
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Failed to set FLEX decoder VFO: {}", e.what());
         }
     }
@@ -96,7 +104,8 @@ public:
             dsp.start();
             audioHandler.start();
             flog::info("FLEX decoder started");
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Failed to start FLEX decoder: {}", e.what());
         }
     }
@@ -108,12 +117,43 @@ public:
             audioHandler.stop();
             dsp.stop();
             flog::info("FLEX decoder stopped");
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Error stopping FLEX decoder: {}", e.what());
         }
     }
 
 private:
+    void showFlexMessageWindow() {
+        if (!ImGui::Begin(("FLEX Messages##" + name).c_str(), &showMessageWindow)) {
+            ImGui::End();
+            return;
+        }
+        // Get messages from the FLEX decoder
+        auto messages = getFlexMessages();
+        // Controls
+        if (ImGui::Button("Clear Messages")) {
+            clearFlexMessages();
+        }
+        ImGui::SameLine();
+        ImGui::Checkbox("Auto Scroll", &autoScrollMessages);
+        ImGui::Separator();
+        // Message display area
+        ImGui::BeginChild("MessageArea", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
+
+        for (const auto& message : messages) {
+            ImGui::TextUnformatted(message.c_str());
+        }
+
+        // Auto-scroll to bottom if enabled and there are new messages
+        if (autoScrollMessages && !messages.empty()) {
+            ImGui::SetScrollHereY(1.0f);
+        }
+
+        ImGui::EndChild();
+        ImGui::End();
+    }
+
     static void _audioHandler(float* data, int count, void* ctx) {
         FLEXDecoder* _this = (FLEXDecoder*)ctx;
         if (_this && _this->initialized) {
@@ -130,7 +170,7 @@ private:
         static int sample_counter = 0;
         sample_counter += count;
 
-        if (sample_counter % (44100 * 5) == 0) {  // Log every 5 seconds
+        if (sample_counter % (44100 * 5) == 0) { // Log every 5 seconds
             flog::info("FLEX decoder received {} samples (total: {})", count, sample_counter);
         }
 
@@ -156,7 +196,8 @@ private:
                     processFlexSample(sample);
                 }
             }
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Error processing FLEX samples: {}", e.what());
         }
     }
@@ -168,7 +209,8 @@ private:
 
         try {
             flexDecoder->processSample(sample);
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Error in FLEX sample processing: {}", e.what());
             // Don't rethrow to avoid cascading crashes
         }
@@ -177,7 +219,7 @@ private:
     void initFLEXDecoder() {
         try {
             // Initialize BCH error correction
-            static const int primitive_poly[] = {1, 0, 1, 0, 0, 1}; // Example for BCH(31,21,5)
+            static const int primitive_poly[] = { 1, 0, 1, 0, 0, 1 }; // Example for BCH(31,21,5)
             bchDecoder = std::make_unique<BCHCode>(primitive_poly, 5, 31, 21, 2);
 
             // Initialize FLEX decoder wrapper
@@ -187,7 +229,8 @@ private:
             });
 
             flog::info("FLEX decoder components initialized");
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Failed to initialize FLEX decoder components: {}", e.what());
             throw;
         }
@@ -206,7 +249,8 @@ private:
 
             // Also use flog for SDR++ logging
             flog::info("FLEX Message - Addr: {}, Type: {}, Data: {}", address, type, data);
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Error handling FLEX message: {}", e.what());
         }
     }
@@ -219,7 +263,8 @@ private:
                 flexDecoder->reset();
                 flog::info("FLEX decoder reset");
             }
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Error resetting FLEX decoder: {}", e.what());
         }
     }
@@ -237,4 +282,6 @@ private:
     bool showRawData = false;
     bool showErrors = false;
     bool initialized;
+    bool showMessageWindow = false;
+    bool autoScrollMessages = true;
 };
