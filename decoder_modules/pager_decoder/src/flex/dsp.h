@@ -3,6 +3,8 @@
 #include <dsp/demod/quadrature.h>
 #include <dsp/correction/dc_blocker.h>
 #include <dsp/loop/fast_agc.h>
+#include <dsp/filter/fir.h>
+#include <dsp/taps/low_pass.h>
 #include <utils/flog.h>
 #include "../dsp.h"
 
@@ -25,10 +27,15 @@ public:
             // FastAGC(input, setPoint, maxGain, rate, initGain)
             agc.init(nullptr, 1.0, 10.0, 1e-3, 1.0);  // setPoint=1.0, maxGain=10.0, rate=1e-3, initGain=1.0
 
+            // Low-pass filter to remove high-frequency noise
+            // FLEX max symbol rate is 3200 baud, so use 5000 Hz cutoff with good roll-off
+            lpTaps = dsp::taps::lowPass<float>(5000.0, 6000.0, samplerate);
+            lpFilter.init(nullptr, lpTaps);
+
             // Initialize the base class
             base_type::init(in);
             initialized = true;
-            flog::info("FLEX DSP initialized: FM demod (±4500 Hz) + AGC at {} Hz", samplerate);
+            flog::info("FLEX DSP initialized: FM demod (±4500 Hz) + AGC + LP filter (5kHz) at {} Hz", samplerate);
         } catch (const std::exception& e) {
             flog::error("FLEX DSP initialization failed: {}", e.what());
             initialized = false;
@@ -94,9 +101,20 @@ public:
                 return count;
             }
 
+            // Low-pass filtering to remove high-frequency noise
+            if (!lpFilter.out.readBuf) {
+                flog::error("FLEX DSP: LP filter output buffer is null");
+                return -1;
+            }
+
+            count = lpFilter.process(count, agc.out.readBuf, lpFilter.out.readBuf);
+            if (count <= 0) {
+                return count;
+            }
+
             // Copy to output with appropriate scaling for FLEX decoder
             for (int i = 0; i < count; i++) {
-                base_type::out.writeBuf[i] = agc.out.readBuf[i] * 0.1f;
+                base_type::out.writeBuf[i] = lpFilter.out.readBuf[i] * 0.1f;
             }
 
             // Flush input and swap output
@@ -125,6 +143,8 @@ public:
 private:
     dsp::demod::Quadrature fmDemod;
     dsp::loop::FastAGC<float> agc;
+    dsp::tap<float> lpTaps;
+    dsp::filter::FIR<float, float> lpFilter;
     double _samplerate;
     bool initialized;
 };
