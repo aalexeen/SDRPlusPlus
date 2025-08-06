@@ -29,7 +29,7 @@ public:
 
             // Low-pass filter to remove high-frequency noise
             // FLEX max symbol rate is 3200 baud, so use 5000 Hz cutoff with good roll-off
-            lpTaps = dsp::taps::lowPass<float>(5000.0, 6000.0, samplerate);
+            lpTaps = dsp::taps::lowPass(5000.0, 6000.0, samplerate);
             lpFilter.init(nullptr, lpTaps);
 
             // Initialize the base class
