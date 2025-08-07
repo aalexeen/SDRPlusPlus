@@ -1,66 +1,50 @@
 #include <imgui.h>
-#include <config.h>
-#include <core.h>
-#include <gui/style.h>
+#include <module.h>
 #include <gui/gui.h>
 #include <signal_path/signal_path.h>
-#include <module.h>
-#include <gui/widgets/folder_select.h>
+#include <signal_path/vfo_manager.h>
+#include <core.h>
 #include <utils/optionlist.h>
+#include <utils/flog.h>
 #include "decoder.h"
-#include "pocsag/decoder.h"  // Your existing POCSAG decoder
-#include "flex/decoder.h"    // FLEX decoder
+#include "pocsag/decoder.h"
+#include "flex/decoder.h"
 
-#define CONCAT(a, b) ((std::string(a) + b).c_str())
 
 SDRPP_MOD_INFO{
     /* Name:            */ "pager_decoder",
-    /* Description:     */ "POCSAG and Flex Pager Decoder"
-    /* Author:          */ "Ryzerth",
-    /* Version:         */ 0, 1, 0,
+    /* Description:     */ "Pager (POCSAG/FLEX) decoder module",
+    /* Author:          */ "SDR++",
+    /* Version:         */ 1, 0, 0,
     /* Max instances    */ -1
 };
 
 ConfigManager config;
 
-enum Protocol {
-    PROTOCOL_INVALID = -1,
-    PROTOCOL_POCSAG,
-    PROTOCOL_FLEX
-};
-
 class PagerDecoderModule : public ModuleManager::Instance {
 public:
-    PagerDecoderModule(std::string name) {
-        this->name = name;
+    PagerDecoderModule(std::string name) : name(name) {
+        // Initialize decoder types
+        decoderTypes.define("POCSAG", DECODER_POCSAG);
+        decoderTypes.define("FLEX", DECODER_FLEX);
 
-        // Define protocols
-        protocols.define("POCSAG", PROTOCOL_POCSAG);
-        protocols.define("FLEX", PROTOCOL_FLEX);
+        // Load config
+        config.acquire();
+        if (!config.conf.contains(name)) {
+            config.conf[name]["selectedDecoder"] = DECODER_POCSAG;
+            config.conf[name]["enabled"] = false;
+        }
+        selectedDecoderId = config.conf[name]["selectedDecoder"];
+        enabled = config.conf[name]["enabled"];
+        config.release(true);
 
-        // Initialize VFO with default values
-        vfo = sigpath::vfoManager.createVFO(name, ImGui::WaterfallVFO::REF_CENTER, 0, 12500, 24000, 12500, 12500, true);
-        vfo->setSnapInterval(1);
-
-        // Create initial decoder but don't start it yet
-        decoder = std::make_unique<POCSAGDecoder>(name, vfo);
-        proto = PROTOCOL_POCSAG;
-
+        // Register the menu for this instance
         gui::menu.registerEntry(name, menuHandler, this, this);
     }
 
     ~PagerDecoderModule() {
+        disable();
         gui::menu.removeEntry(name);
-        // Stop DSP
-        if (enabled && decoder) {
-            decoder->stop();
-            decoder.reset();
-        }
-        if (vfo) {
-            sigpath::vfoManager.deleteVFO(vfo);
-        }
-
-        sigpath::sinkManager.unregisterStream(name);
     }
 
     void postInit() {}
@@ -68,18 +52,29 @@ public:
     void enable() {
         if (enabled) return;
 
-        double bw = gui::waterfall.getBandwidth();
+        // Create VFO with proper initialization (similar to radio module)
+        vfo = sigpath::vfoManager.createVFO(name, ImGui::WaterfallVFO::REF_CENTER, 0, 12500, 24000, 12500, 12500, true);
+
         if (!vfo) {
-            vfo = sigpath::vfoManager.createVFO(name, ImGui::WaterfallVFO::REF_CENTER, std::clamp<double>(0, -bw / 2.0, bw / 2.0), 12500, 24000, 12500, 12500, true);
-            vfo->setSnapInterval(1);
+            flog::error("Failed to create VFO for pager decoder");
+            return;
         }
 
-        if (decoder) {
-            decoder->setVFO(vfo);
-            decoder->start();
-        }
+        // Configure VFO properly for pager frequencies
+        vfo->setBandwidthLimits(12500, 12500, true);
+        vfo->setSampleRate(24000, 12500);
+
+        // Create appropriate decoder
+        createDecoder();
 
         enabled = true;
+
+        // Save state
+        config.acquire();
+        config.conf[name]["enabled"] = enabled;
+        config.release(true);
+
+        flog::info("Pager decoder enabled with VFO waterfall");
     }
 
     void disable() {
@@ -87,89 +82,108 @@ public:
 
         if (decoder) {
             decoder->stop();
+            delete decoder;
+            decoder = nullptr;
         }
+
+        if (vfo) {
+            sigpath::vfoManager.deleteVFO(vfo);
+            vfo = nullptr;
+        }
+
         enabled = false;
+
+        // Save state
+        config.acquire();
+        config.conf[name]["enabled"] = enabled;
+        config.release(true);
+
+        flog::info("Pager decoder disabled");
     }
 
     bool isEnabled() {
         return enabled;
     }
 
-    void selectProtocol(Protocol newProto) {
-        // If the protocol hasn't changed, no need to do anything
-        if (newProto == proto) { return; }
-
-        // Stop current decoder if running
-        bool wasRunning = enabled;
-        if (wasRunning && decoder) {
-            decoder->stop();
-        }
-
-        // Delete current decoder
-        decoder.reset();
-
-        // Create a new decoder
-        switch (newProto) {
-        case PROTOCOL_POCSAG:
-            decoder = std::make_unique<POCSAGDecoder>(name, vfo);
-            break;
-        case PROTOCOL_FLEX:
-            decoder = std::make_unique<FLEXDecoder>(name, vfo);
-            break;
-        default:
-            flog::error("Tried to select unknown pager protocol");
-            return;
-        }
-
-        // Start the new decoder if we were running before
-        if (wasRunning && decoder) {
-            decoder->setVFO(vfo);
-            decoder->start();
-        }
-
-        // Save selected protocol
-        proto = newProto;
-    }
-
-private:
+    // Static menu handler - this is what was missing!
     static void menuHandler(void* ctx) {
         PagerDecoderModule* _this = (PagerDecoderModule*)ctx;
 
-        float menuWidth = ImGui::GetContentRegionAvail().x;
-
-        if (!_this->enabled) { style::beginDisabled(); }
-
-        ImGui::LeftLabel("Protocol");
-        ImGui::FillWidth();
-        if (ImGui::Combo(("##pager_decoder_proto_" + _this->name).c_str(), &_this->protoId, _this->protocols.txt)) {
-            _this->selectProtocol(_this->protocols.value(_this->protoId));
+        if (!_this->enabled) {
+            if (ImGui::Button("Enable")) {
+                _this->enable();
+            }
+            return;
         }
 
-        if (_this->decoder) { _this->decoder->showMenu(); }
+        ImGui::Text("Pager Decoder");
 
-        ImGui::Button(("Record##pager_decoder_show_" + _this->name).c_str(), ImVec2(menuWidth, 0));
-        ImGui::Button(("Show Messages##pager_decoder_show_" + _this->name).c_str(), ImVec2(menuWidth, 0));
+        // Decoder selection
+        ImGui::Text("Protocol:");
+        if (ImGui::Combo("##decoder_type", &_this->selectedDecoderId, _this->decoderTypes.txt)) {
+            _this->createDecoder();
+            config.acquire();
+            config.conf[_this->name]["selectedDecoder"] = _this->selectedDecoderId;
+            config.release(true);
+        }
 
-        if (!_this->enabled) { style::endDisabled(); }
+        if (ImGui::Button("Disable")) {
+            _this->disable();
+        }
+
+        // Show decoder-specific menu if available
+        if (_this->decoder) {
+            ImGui::Separator();
+            _this->decoder->showMenu();
+        }
+    }
+
+private:
+    enum DecoderType {
+        DECODER_POCSAG,
+        DECODER_FLEX
+    };
+
+    void createDecoder() {
+        if (decoder) {
+            decoder->stop();
+            delete decoder;
+        }
+
+        if (!vfo) {
+            flog::error("Cannot create decoder without VFO");
+            return;
+        }
+
+        switch (selectedDecoderId) {
+        case DECODER_POCSAG:
+            decoder = new POCSAGDecoder(name, vfo);
+            break;
+        case DECODER_FLEX:
+            decoder = new FLEXDecoder(name, vfo);
+            break;
+        default:
+            flog::error("Unknown decoder type: {}", selectedDecoderId);
+            return;
+        }
+
+        if (decoder && enabled) {
+            decoder->start();
+            flog::info("Created and started {} decoder", decoderTypes.key(selectedDecoderId));
+        }
     }
 
     std::string name;
-    bool enabled = true;
+    bool enabled = false;
 
-    Protocol proto = PROTOCOL_INVALID;
-    int protoId = 0;
+    VFOManager::VFO* vfo = nullptr;
+    Decoder* decoder = nullptr;
 
-    OptionList<std::string, Protocol> protocols;
-
-    // DSP Chain
-    VFOManager::VFO* vfo;
-    std::unique_ptr<Decoder> decoder;
-
-    bool showLines = false;
+    int selectedDecoderId = DECODER_POCSAG;
+    OptionList<std::string, DecoderType> decoderTypes;
 };
 
 MOD_EXPORT void _INIT_() {
-    // Create default recording directory
     json def = json({});
     config.setPath(core::args["root"].s() + "/pager_decoder_config.json");
     config.load(def);
