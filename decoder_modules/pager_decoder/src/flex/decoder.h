@@ -16,7 +16,7 @@ public:
     FLEXDecoder(const std::string& name, VFOManager::VFO* vfo) : name(name), vfo(vfo), initialized(false) {
         try {
             // Set VFO parameters for FLEX (typically 929-932 MHz, 25kHz bandwidth)
-            vfo->setBandwidthLimits(25000, 25000, true);
+            vfo->setBandwidthLimits(12500, 12500, true);
             vfo->setSampleRate(PAGER_AUDIO_SAMPLERATE, 25000);
 
             // Initialize DSP chain with validation
@@ -125,12 +125,24 @@ public:
 
 private:
     void showFlexMessageWindow() {
-        if (!ImGui::Begin(("FLEX Messages##" + name).c_str(), &showMessageWindow)) {
+        // Use window flags to prevent interaction with other windows
+        ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoFocusOnAppearing;
+
+        // Set initial position and size on first appearance
+        static bool first_time = true;
+        if (first_time) {
+            ImGui::SetNextWindowPos(ImVec2(100, 100), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(500, 300), ImGuiCond_FirstUseEver);
+            first_time = false;
+        }
+
+        if (!ImGui::Begin(("FLEX Messages##" + name).c_str(), &showMessageWindow, window_flags)) {
             ImGui::End();
             return;
         }
-        // Get messages from the FLEX decoder
+        // Get messages from the FLEX decoder using the existing global functions
         auto messages = getFlexMessages();
+
         // Controls
         if (ImGui::Button("Clear Messages")) {
             clearFlexMessages();
@@ -138,6 +150,7 @@ private:
         ImGui::SameLine();
         ImGui::Checkbox("Auto Scroll", &autoScrollMessages);
         ImGui::Separator();
+
         // Message display area
         ImGui::BeginChild("MessageArea", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
 
