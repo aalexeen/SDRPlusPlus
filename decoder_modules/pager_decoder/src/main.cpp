@@ -60,6 +60,9 @@ public:
             return;
         }
 
+        // Set the VFO slider step (snap) in Hz, e.g., 1000 Hz
+        vfo->setSnapInterval(/* step in Hz, e.g. */ 1000.0);
+
         // Configure VFO properly for pager frequencies
         vfo->setBandwidthLimits(12500, 12500, true);
         vfo->setSampleRate(24000, 12500);
