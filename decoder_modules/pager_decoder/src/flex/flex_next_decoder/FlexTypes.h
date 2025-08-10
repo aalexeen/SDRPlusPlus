@@ -96,9 +96,44 @@ namespace flex_next_decoder {
         std::array<uint32_t, PHASE_WORDS> buffer{};
         int idle_count = 0;
 
+        /**
+         * @brief Clear all data and reset idle count
+         */
         void clear() {
             buffer.fill(0);
             idle_count = 0;
+        }
+
+        /**
+         * @brief Check if buffer contains only idle patterns
+         * @return true if idle count exceeds threshold
+         */
+        bool isIdle() const {
+            return idle_count > IDLE_THRESHOLD;
+        }
+
+        /**
+         * @brief Get read-only access to buffer data
+         * @return Pointer to buffer data
+         */
+        const uint32_t* data() const {
+            return buffer.data();
+        }
+
+        /**
+         * @brief Get mutable access to buffer data (for internal use)
+         * @return Pointer to buffer data
+         */
+        uint32_t* data() {
+            return buffer.data();
+        }
+
+        /**
+         * @brief Get buffer size
+         * @return Number of words in buffer
+         */
+        constexpr size_t size() const {
+            return PHASE_WORDS;
         }
     };
 
