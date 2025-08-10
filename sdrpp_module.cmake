@@ -25,7 +25,8 @@ add_library(${PROJECT_NAME} SHARED ${SRC}
         decoder_modules/pager_decoder/src/flex/flex_next_decoder/parsers/BinaryParser.h
         decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexGroupHandler.h
         decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexOutputFormatter.h
-        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexErrorCorrector.cpp)
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexErrorCorrector.cpp
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexStateMachine.cpp)
 target_link_libraries(${PROJECT_NAME} PRIVATE sdrpp_core)
 target_include_directories(${PROJECT_NAME} PRIVATE "${SDRPP_CORE_ROOT}/src/")
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")
