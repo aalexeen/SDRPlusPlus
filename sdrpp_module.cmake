@@ -8,7 +8,24 @@ endif ()
 
 # Create shared lib and link to core
 # Only use the ${SRC} variable - each module's CMakeLists.txt populates this
-add_library(${PROJECT_NAME} SHARED ${SRC})
+add_library(${PROJECT_NAME} SHARED ${SRC}
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexDecoder.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexTypes.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexDemodulator.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexStateMachine.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexSynchronizer.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexFrameProcessor.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexDataCollector.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexErrorCorrector.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexMessageDecoder.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/parsers/IMessageParser.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/parsers/AlphanumericParser.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/parsers/NumericParser.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/parsers/ToneParser.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/parsers/BinaryParser.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexGroupHandler.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexOutputFormatter.h
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexErrorCorrector.cpp)
 target_link_libraries(${PROJECT_NAME} PRIVATE sdrpp_core)
 target_include_directories(${PROJECT_NAME} PRIVATE "${SDRPP_CORE_ROOT}/src/")
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")
