@@ -1,28 +1,94 @@
 #pragma once
 
 #include "FlexTypes.h"
+#include <memory>
+#include <array>
+#include <functional>
 #include <string>
-#include <iostream>
 
 namespace flex_next_decoder {
 
+// Forward declarations
+class FlexStateMachine;
+class IFlexState;
+
+/**
+ * @brief Callbacks for state machine to interact with external components
+ *
+ * These allow states to trigger actions without tight coupling to specific components.
+ * The main decoder will provide these callbacks when creating the state machine.
+ */
+struct FlexStateCallbacks {
+    std::function<uint32_t(uint8_t)> detect_sync;                    // Returns sync_code or 0
+    std::function<void(uint32_t)> decode_sync_mode;                  // Process sync code
+    std::function<void(uint8_t, uint32_t&)> accumulate_fiw;          // Accumulate FIW data
+    std::function<bool(uint32_t)> process_fiw;                       // Process FIW, return success
+    std::function<void()> clear_phase_data;                          // Clear data buffers
+    std::function<bool(uint8_t)> read_data;                          // Read data, return idle
+    std::function<void()> process_collected_data;                    // Process final data
+};
+
+/**
+ * @interface IFlexState
+ * @brief State Pattern interface for FLEX decoder states
+ *
+ * Each concrete state implements its own symbol processing logic
+ * and decides when to transition to other states.
+ */
+class IFlexState {
+public:
+    virtual ~IFlexState() = default;
+
+    /**
+     * @brief Process a symbol in this state
+     * @param context Reference to state machine context
+     * @param symbol Symbol to process (0-3)
+     * @return Next state to transition to (or current state to stay)
+     */
+    virtual FlexState processSymbol(FlexStateMachine& context, uint8_t symbol) = 0;
+
+    /**
+     * @brief Called when entering this state
+     * @param context Reference to state machine context
+     */
+    virtual void onEnter(FlexStateMachine& context) {}
+
+    /**
+     * @brief Called when exiting this state
+     * @param context Reference to state machine context
+     */
+    virtual void onExit(FlexStateMachine& context) {}
+
+    /**
+     * @brief Get the state type this object represents
+     * @return FlexState enum value
+     */
+    virtual FlexState getStateType() const = 0;
+
+    /**
+     * @brief Get human-readable state name
+     * @return State name string
+     */
+    virtual std::string getStateName() const = 0;
+};
+
 /**
  * @class FlexStateMachine
- * @brief FLEX Protocol State Machine
+ * @brief Context class for State Pattern implementation
  *
- * Manages the four-state FLEX decoding process:
- * 1. SYNC1 - Looking for initial sync pattern
- * 2. FIW   - Processing Frame Information Word
- * 3. SYNC2 - Processing second sync header
- * 4. DATA  - Processing data payload
- *
- * Tracks state-specific counters and handles state transitions.
- * Provides logging when states change for debugging.
+ * Delegates symbol processing to current state object.
+ * States can access context data and trigger transitions.
  */
 class FlexStateMachine {
 public:
     /**
-     * @brief Constructor - initializes to SYNC1 state
+     * @brief Constructor with callbacks for external component interaction
+     * @param callbacks Functions for interacting with other FLEX components
+     */
+    explicit FlexStateMachine(const FlexStateCallbacks& callbacks);
+
+    /**
+     * @brief Default constructor (callbacks must be set later)
      */
     FlexStateMachine();
 
@@ -31,147 +97,176 @@ public:
      */
     ~FlexStateMachine() = default;
 
-    // Copy and move operations
-    FlexStateMachine(const FlexStateMachine&) = default;
-    FlexStateMachine& operator=(const FlexStateMachine&) = default;
+    // Delete copy operations (unique_ptr members)
+    FlexStateMachine(const FlexStateMachine&) = delete;
+    FlexStateMachine& operator=(const FlexStateMachine&) = delete;
+
+    // Allow move operations
     FlexStateMachine(FlexStateMachine&&) = default;
     FlexStateMachine& operator=(FlexStateMachine&&) = default;
 
     //=========================================================================
-    // State Access Methods
+    // Main State Pattern Interface
     //=========================================================================
 
     /**
-     * @brief Get current state
-     * @return Current FlexState
+     * @brief Process symbol through current state
+     * @param symbol Symbol to process (0-3)
      */
-    FlexState getCurrentState() const { return current_state_; }
+    void processSymbol(uint8_t symbol);
 
     /**
-     * @brief Get previous state
-     * @return Previous FlexState
+     * @brief Set callbacks for external component interaction
+     * @param callbacks Callback functions
      */
-    FlexState getPreviousState() const { return previous_state_; }
-
-    /**
-     * @brief Check if state has changed since last call to reportStateChange()
-     * @return true if state changed
-     */
-    bool hasStateChanged() const { return current_state_ != previous_state_; }
+    void setCallbacks(const FlexStateCallbacks& callbacks);
 
     //=========================================================================
-    // State Transition Methods
+    // State Transition Methods (called by states)
     //=========================================================================
 
     /**
-     * @brief Change to new state and report if changed
+     * @brief Transition to new state
      * @param new_state State to transition to
      */
-    void setState(FlexState new_state);
+    void changeState(FlexState new_state);
 
     /**
-     * @brief Reset state machine to initial state
+     * @brief Reset to initial state
      */
     void reset();
 
-    /**
-     * @brief Report state change if it occurred (for logging)
-     */
-    void reportStateChange();
-
     //=========================================================================
-    // State-Specific Counter Methods
+    // Context Data Access (for states)
     //=========================================================================
 
-    // FIW State Counters
+    // State queries
+    FlexState getCurrentState() const;
+    FlexState getPreviousState() const { return previous_state_; }
+    std::string getCurrentStateName() const;
+
+    // Counter access
     uint32_t getFIWCount() const { return fiw_count_; }
     void incrementFIWCount() { ++fiw_count_; }
     void resetFIWCount() { fiw_count_ = 0; }
 
-    // SYNC2 State Counters
     uint32_t getSync2Count() const { return sync2_count_; }
     void incrementSync2Count() { ++sync2_count_; }
     void resetSync2Count() { sync2_count_ = 0; }
 
-    // DATA State Counters
     uint32_t getDataCount() const { return data_count_; }
     void incrementDataCount() { ++data_count_; }
     void resetDataCount() { data_count_ = 0; }
 
-    //=========================================================================
-    // State Transition Logic Helpers
-    //=========================================================================
+    // Shared data access
+    uint32_t getBaudRate() const { return baud_rate_; }
+    void setBaudRate(uint32_t baud) { baud_rate_ = baud; }
 
-    /**
-     * @brief Check if ready to transition from SYNC1 to FIW
-     * @param sync_found true if sync pattern was detected
-     * @return true if should transition to FIW
-     */
-    bool shouldTransitionToFIW(bool sync_found);
+    uint32_t getFIWRawData() const { return fiw_raw_data_; }
+    void setFIWRawData(uint32_t data) { fiw_raw_data_ = data; }
 
-    /**
-     * @brief Check if ready to transition from FIW to SYNC2 or back to SYNC1
-     * @param fiw_decode_success true if FIW was successfully decoded
-     * @return Next state (SYNC2 if success, SYNC1 if failure)
-     */
-    FlexState shouldTransitionFromFIW(bool fiw_decode_success);
-
-    /**
-     * @brief Check if ready to transition from SYNC2 to DATA
-     * @param baud_rate Current baud rate for timing calculation
-     * @return true if should transition to DATA
-     */
-    bool shouldTransitionToData(uint32_t baud_rate);
-
-    /**
-     * @brief Check if ready to transition from DATA back to SYNC1
-     * @param baud_rate Current baud rate for timing calculation
-     * @param idle_detected true if idle condition detected
-     * @return true if should transition back to SYNC1
-     */
-    bool shouldTransitionFromData(uint32_t baud_rate, bool idle_detected);
-
-    //=========================================================================
-    // Utility Methods
-    //=========================================================================
-
-    /**
-     * @brief Get string representation of current state
-     * @return State name as string
-     */
-    std::string getCurrentStateName() const;
-
-    /**
-     * @brief Get string representation of any state
-     * @param state State to get name for
-     * @return State name as string
-     */
-    static std::string getStateName(FlexState state);
+    // Callback access (for states to call external components)
+    const FlexStateCallbacks& getCallbacks() const { return callbacks_; }
 
 private:
     //=========================================================================
-    // State Variables
+    // State Pattern Implementation
     //=========================================================================
 
-    FlexState current_state_;          ///< Current state
-    FlexState previous_state_;         ///< Previous state (for change detection)
+    std::unique_ptr<IFlexState> current_state_;           ///< Current active state
+    std::array<std::unique_ptr<IFlexState>, 4> states_;  ///< All state objects
+    FlexState previous_state_;                            ///< Previous state for logging
 
     //=========================================================================
-    // State-Specific Counters
+    // Context Data
     //=========================================================================
 
-    uint32_t fiw_count_;              ///< Bit counter for FIW state (0-48)
-    uint32_t sync2_count_;            ///< Symbol counter for SYNC2 state
-    uint32_t data_count_;             ///< Symbol counter for DATA state
+    // State-specific counters
+    uint32_t fiw_count_;              ///< FIW bit counter (0-48)
+    uint32_t sync2_count_;            ///< SYNC2 symbol counter
+    uint32_t data_count_;             ///< DATA symbol counter
+
+    // Shared state data
+    uint32_t baud_rate_;              ///< Current baud rate (1600/3200)
+    uint32_t fiw_raw_data_;           ///< Accumulated FIW data
+
+    // External component callbacks
+    FlexStateCallbacks callbacks_;
 
     //=========================================================================
-    // Constants for State Transitions
+    // Helper Methods
     //=========================================================================
 
-    static constexpr uint32_t FIW_DOTTING_BITS = 16;     ///< Bits to skip before FIW data
-    static constexpr uint32_t FIW_TOTAL_BITS = 48;       ///< Total FIW bits (16 + 32)
-    static constexpr uint32_t SYNC2_DURATION_MS = 25;    ///< SYNC2 duration in milliseconds
-    static constexpr uint32_t DATA_DURATION_MS = 1760;   ///< DATA duration in milliseconds
+    void initializeStates();
+    void reportStateChange();
+
+    //=========================================================================
+    // Constants
+    //=========================================================================
+
+    static constexpr uint32_t FIW_DOTTING_BITS = 16;     ///< Bits to skip before FIW
+    static constexpr uint32_t FIW_TOTAL_BITS = 48;       ///< Total FIW bits
+    static constexpr uint32_t SYNC2_DURATION_MS = 25;    ///< SYNC2 duration (ms)
+    static constexpr uint32_t DATA_DURATION_MS = 1760;   ///< DATA duration (ms)
+
+    // State objects need access to private members
+    friend class Sync1State;
+    friend class FIWState;
+    friend class Sync2State;
+    friend class DataState;
+};
+
+//=============================================================================
+// Concrete State Classes
+//=============================================================================
+
+/**
+ * @class Sync1State
+ * @brief SYNC1 state - looking for sync patterns
+ */
+class Sync1State : public IFlexState {
+public:
+    FlexState processSymbol(FlexStateMachine& context, uint8_t symbol) override;
+    void onEnter(FlexStateMachine& context) override;
+    FlexState getStateType() const override { return FlexState::Sync1; }
+    std::string getStateName() const override { return "SYNC1"; }
+};
+
+/**
+ * @class FIWState
+ * @brief FIW state - processing Frame Information Word
+ */
+class FIWState : public IFlexState {
+public:
+    FlexState processSymbol(FlexStateMachine& context, uint8_t symbol) override;
+    void onEnter(FlexStateMachine& context) override;
+    FlexState getStateType() const override { return FlexState::FIW; }
+    std::string getStateName() const override { return "FIW"; }
+};
+
+/**
+ * @class Sync2State
+ * @brief SYNC2 state - processing second sync header
+ */
+class Sync2State : public IFlexState {
+public:
+    FlexState processSymbol(FlexStateMachine& context, uint8_t symbol) override;
+    void onEnter(FlexStateMachine& context) override;
+    FlexState getStateType() const override { return FlexState::Sync2; }
+    std::string getStateName() const override { return "SYNC2"; }
+};
+
+/**
+ * @class DataState
+ * @brief DATA state - processing data payload
+ */
+class DataState : public IFlexState {
+public:
+    FlexState processSymbol(FlexStateMachine& context, uint8_t symbol) override;
+    void onEnter(FlexStateMachine& context) override;
+    void onExit(FlexStateMachine& context) override;
+    FlexState getStateType() const override { return FlexState::Data; }
+    std::string getStateName() const override { return "DATA"; }
 };
 
 } // namespace flex_next_decoder
