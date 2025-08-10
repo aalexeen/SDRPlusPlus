@@ -90,9 +90,19 @@ GroupMessageData AlphanumericParser::processGroupMessage(const MessageParseInput
 
     group_data.group_bit = input.group_bit;
     
-    // Note: The actual capcode list would be provided by the GroupHandler
-    // This parser only indicates that group processing is needed
-    // The calling code (FlexMessageDecoder) should populate the capcode list
+    // NOTE: AlphanumericParser only identifies group messages and sets the group_bit.
+    // The actual capcode list population should be done by the calling code using
+    // FlexGroupHandler::processGroupMessage(). This maintains separation of concerns
+    // where the parser handles message content and the group handler manages group state.
+    //
+    // Integration example (in calling code like FlexMessageDecoder or main decoder):
+    //
+    // if (!result.group_data.isEmpty()) {
+    //     GroupMessageInfo group_info = group_handler.processGroupMessage(result.group_data.group_bit);
+    //     if (group_info.isValid()) {
+    //         result.group_data.capcodes = std::move(group_info.capcodes);
+    //     }
+    // }
     
     return group_data;
 }
