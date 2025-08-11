@@ -23,11 +23,11 @@ namespace flex_next_decoder {
             data_collector_ = std::make_unique<FlexDataCollector>();
 
             // Error correction (equivalent to BCH initialization in original C)
-            error_corrector_ = std::make_unique<FlexErrorCorrector>();
+            error_corrector_ = std::make_shared<FlexErrorCorrector>();
 
             // Message processing subsystems
-            group_handler_ = std::make_unique<FlexGroupHandler>();
-            message_decoder_ = std::make_unique<FlexMessageDecoder>(group_handler_);
+            group_handler_ = std::make_shared<FlexGroupHandler>();
+            message_decoder_ = std::make_shared<FlexMessageDecoder>(group_handler_);
 
             // Frame processing (depends on error corrector and message decoder)
             frame_processor_ = std::make_unique<FlexFrameProcessor>(
@@ -49,6 +49,8 @@ namespace flex_next_decoder {
             throw;
         }
     }
+
+    FlexDecoder::~FlexDecoder() = default;
 
     void FlexDecoder::processSamples(const float* samples, size_t count) {
         // Direct equivalent of original flex_next_demod() function

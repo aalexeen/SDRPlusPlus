@@ -1,4 +1,3 @@
-
 #pragma once
 #include "../decoder.h"
 #include <signal_path/vfo_manager.h>
@@ -13,16 +12,16 @@
 #include <chrono>
 #include <thread>
 #include <optional>
-#include "dsp.h"
-#include "flex_next_decoder/FlexDecoder.h"  // New decoder
-#include "../BCHCode.h"
+#include <sstream>                         // For string formatting
+#include "dsp.h"                           // Local FLEX DSP header
+#include "flex_next_decoder/FlexDecoder.h" // New decoder
+#include "../BCHCode.h"                    // BCH error correction (up one directory)
 
 class FLEXDecoder : public Decoder {
 public:
     FLEXDecoder(const std::string& name, VFOManager::VFO* vfo)
         : name_(name), vfo_(vfo), initialized_(false), healthy_(true),
-          lastHealthCheck_(std::chrono::steady_clock::now()),
-          isRunning_(false) {
+          lastHealthCheck_(std::chrono::steady_clock::now()), isRunning_(false) {
 
         std::lock_guard<std::recursive_mutex> lock(decoderMutex_);
 
@@ -84,7 +83,8 @@ public:
             cleanup();
 
             flog::debug("FLEX decoder '{}' destroyed", name_);
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Exception in FLEX decoder destructor: {}", e.what());
         }
     }
@@ -107,7 +107,8 @@ public:
         bool isHealthy = healthy_.load();
         if (isHealthy) {
             ImGui::TextColored(ImVec4(0, 1, 0, 1), "FLEX Decoder (HEALTHY)");
-        } else {
+        }
+        else {
             ImGui::TextColored(ImVec4(1, 0, 0, 1), "FLEX Decoder (UNHEALTHY)");
             ImGui::SameLine();
             if (ImGui::Button("Recover")) {
@@ -287,14 +288,14 @@ public:
 private:
     // Thread safety
     mutable std::recursive_mutex decoderMutex_;
-    std::atomic<bool> initialized_{false};
-    std::atomic<bool> healthy_{true};
-    std::atomic<bool> isRunning_{false};
+    std::atomic<bool> initialized_{ false };
+    std::atomic<bool> healthy_{ true };
+    std::atomic<bool> isRunning_{ false };
 
     // Performance monitoring
-    std::atomic<size_t> samplesProcessed_{0};
-    std::atomic<size_t> errorCount_{0};
-    std::atomic<size_t> messagesDecoded_{0};
+    std::atomic<size_t> samplesProcessed_{ 0 };
+    std::atomic<size_t> errorCount_{ 0 };
+    std::atomic<size_t> messagesDecoded_{ 0 };
     std::chrono::steady_clock::time_point lastHealthCheck_;
 
     bool initializeDSP() {
@@ -307,10 +308,10 @@ private:
             }
 
             flog::info("FLEX DSP initialized: FM demod (±4500 Hz) + AGC + LP filter (5kHz) at {} Hz",
-                      dsp_.getAudioSampleRate());
+                       dsp_.getAudioSampleRate());
             return true;
-
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Exception during DSP initialization: {}", e.what());
             return false;
         }
@@ -331,8 +332,8 @@ private:
 
             flog::info("FLEX decoder components initialized");
             return true;
-
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Failed to initialize FLEX decoder components: {}", e.what());
             return false;
         }
@@ -356,7 +357,8 @@ private:
         // Health indicator in message window
         if (healthy_.load()) {
             ImGui::TextColored(ImVec4(0, 1, 0, 1), "Decoder Status: HEALTHY");
-        } else {
+        }
+        else {
             ImGui::TextColored(ImVec4(1, 0, 0, 1), "Decoder Status: UNHEALTHY");
         }
 
@@ -415,8 +417,8 @@ private:
         try {
             // Process samples through the new FLEX decoder
             processFlexSamples(samples, count);
-
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Error processing FLEX samples in '{}': {}", name_, e.what());
             errorCount_.fetch_add(count); // Count entire chunk as errors
             healthy_.store(false);
@@ -431,8 +433,8 @@ private:
         try {
             // Use the new decoder's processSamples method
             flexDecoder_->processSamples(samples, count);
-
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             errorCount_.fetch_add(count);
 
             // Only log errors occasionally to avoid spam
@@ -474,14 +476,15 @@ private:
             std::string safeData = data;
             // Remove any non-printable characters
             safeData.erase(std::remove_if(safeData.begin(), safeData.end(),
-                [](char c) { return !std::isprint(static_cast<unsigned char>(c)); }),
-                safeData.end());
+                                          [](char c) { return !std::isprint(static_cast<unsigned char>(c)); }),
+                           safeData.end());
 
-            // Store message for display
+            // Store message for display using stringstream instead of fmt::format
             {
                 std::lock_guard<std::mutex> lock(messagesMutex_);
-                messages_.emplace_back(fmt::format("FLEX[{}]: Addr={}, Type={}, Data={}",
-                    name_, address, type, safeData));
+                std::stringstream ss;
+                ss << "FLEX[" << name_ << "]: Addr=" << address << ", Type=" << type << ", Data=" << safeData;
+                messages_.emplace_back(ss.str());
 
                 // Limit message history
                 if (messages_.size() > MAX_MESSAGES) {
@@ -578,8 +581,8 @@ private:
 
             flog::info("Recovery successful for FLEX decoder '{}'", name_);
             return true;
-
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Recovery failed for FLEX decoder '{}': {}", name_, e.what());
             healthy_.store(false);
             return false;
@@ -617,8 +620,8 @@ private:
                 flog::error("FLEX decoder components invalid in '{}'", name_);
                 healthy_.store(false);
             }
-
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Health check exception for FLEX decoder '{}': {}", name_, e.what());
             healthy_.store(false);
         }
@@ -629,7 +632,8 @@ private:
             if (flexDecoder_) {
                 flexDecoder_.reset();
             }
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("Exception during cleanup: {}", e.what());
         }
     }
@@ -637,11 +641,16 @@ private:
     std::string stateToString(flex_next_decoder::FlexState state) {
         using namespace flex_next_decoder;
         switch (state) {
-            case FlexState::Sync1: return "SYNC1";
-            case FlexState::FIW: return "FIW";
-            case FlexState::Sync2: return "SYNC2";
-            case FlexState::Data: return "DATA";
-            default: return "UNKNOWN";
+        case FlexState::Sync1:
+            return "SYNC1";
+        case FlexState::FIW:
+            return "FIW";
+        case FlexState::Sync2:
+            return "SYNC2";
+        case FlexState::Data:
+            return "DATA";
+        default:
+            return "UNKNOWN";
         }
     }
 

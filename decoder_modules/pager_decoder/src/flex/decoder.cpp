@@ -5,38 +5,40 @@
 // Implementation details that don't need to be in the header
 namespace {
     // Format a FLEX message for display
-    std::string formatFlexMessage(const std::string& decoder_name, 
-                                  int64_t address, 
-                                  int type, 
-                                  const std::string& data) {
-        // Sanitize data - remove non-printable characters
-        std::string sanitized_data = data;
-        sanitized_data.erase(
-            std::remove_if(sanitized_data.begin(), sanitized_data.end(),
-                [](unsigned char c) { return !std::isprint(c) && !std::isspace(c); }),
-            sanitized_data.end()
-        );
-
-        return fmt::format("FLEX[{}]: Addr={}, Type={}, Data=\"{}\"",
-                          decoder_name, address, type, sanitized_data);
+    std::string formatFlexMessage(const std::string& name, int64_t address, int type, const std::string& data) {
+        std::stringstream ss;
+        ss << "FLEX[" << name << "]: Addr=" << address << ", Type=" << type << ", Data=\"" << data << "\"";
+        return ss.str();
     }
 
-    // Message type to string conversion
-    std::string messageTypeToString(int type) {
-        switch (type) {
-            case 0: return "Secure";
-            case 1: return "ShortInstruction";
-            case 2: return "Tone";
-            case 3: return "StandardNumeric";
-            case 4: return "SpecialNumeric";
-            case 5: return "Alphanumeric";
-            case 6: return "Binary";
-            case 7: return "NumberedNumeric";
-            default: return "Unknown";
-        }
+
+}
+
+// Message type to string conversion
+std::string messageTypeToString(int type) {
+    switch (type) {
+    case 0:
+        return "Secure";
+    case 1:
+        return "ShortInstruction";
+    case 2:
+        return "Tone";
+    case 3:
+        return "StandardNumeric";
+    case 4:
+        return "SpecialNumeric";
+    case 5:
+        return "Alphanumeric";
+    case 6:
+        return "Binary";
+    case 7:
+        return "NumberedNumeric";
+    default:
+        return "Unknown";
     }
 }
 
+/*
 // Message handling with the new decoder architecture
 // This would be called by the flex_next_decoder through a callback mechanism
 void FLEXDecoder::handleFlexMessage(int64_t address, int type, const std::string& data) {
@@ -62,7 +64,7 @@ void FLEXDecoder::handleFlexMessage(int64_t address, int type, const std::string
         {
             std::lock_guard<std::mutex> lock(messagesMutex_);
             messages_.emplace_back(std::move(formatted_message));
-            
+
             // Limit message history to prevent memory bloat
             if (messages_.size() > MAX_MESSAGES) {
                 messages_.erase(messages_.begin());
@@ -70,15 +72,16 @@ void FLEXDecoder::handleFlexMessage(int64_t address, int type, const std::string
         }
 
         // Console output for immediate feedback
-        printf("FLEX[%s]: Addr=%ld Type=%s Data=%s\n", 
+        printf("FLEX[%s]: Addr=%ld Type=%s Data=%s\n",
                name_.c_str(), address, messageTypeToString(type).c_str(), data.c_str());
 
         // SDR++ logging
-        flog::info("FLEX[{}] Message - Addr: {}, Type: {} ({}), Data: {}", 
+        flog::info("FLEX[{}] Message - Addr: {}, Type: {} ({}), Data: {}",
                    name_, address, type, messageTypeToString(type), data);
-
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
         flog::error("Error handling FLEX message in '{}': {}", name_, e.what());
         errorCount_.fetch_add(1);
     }
-}
+
+}*/

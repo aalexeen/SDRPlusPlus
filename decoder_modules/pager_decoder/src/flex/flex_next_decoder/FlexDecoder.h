@@ -55,7 +55,7 @@ namespace flex_next_decoder {
          * Equivalent to original flex_next_deinit() + Flex_Delete().
          * All subsystems automatically cleaned up via unique_ptr.
          */
-        ~FlexDecoder() = default;
+        ~FlexDecoder();
 
         // Non-copyable but moveable (manages unique decoder state)
         FlexDecoder(const FlexDecoder&) = delete;
@@ -213,11 +213,11 @@ namespace flex_next_decoder {
         // Frame and data processing
         std::unique_ptr<FlexFrameProcessor> frame_processor_; ///< Frame processing and BCH correction
         std::unique_ptr<FlexDataCollector> data_collector_;   ///< Phase data collection and interleaving
-        std::unique_ptr<FlexErrorCorrector> error_corrector_; ///< BCH error correction
+        std::shared_ptr<FlexErrorCorrector> error_corrector_; ///< BCH error correction
 
         // Message processing
-        std::unique_ptr<FlexMessageDecoder> message_decoder_;   ///< Message parsing (Strategy pattern)
-        std::unique_ptr<FlexGroupHandler> group_handler_;       ///< Group messaging support
+        std::shared_ptr<FlexMessageDecoder> message_decoder_;   ///< Message parsing (Strategy pattern)
+        std::shared_ptr<FlexGroupHandler> group_handler_;       ///< Group messaging support
         std::unique_ptr<FlexOutputFormatter> output_formatter_; ///< Final output formatting
 
         //=========================================================================

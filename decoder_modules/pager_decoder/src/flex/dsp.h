@@ -1,3 +1,4 @@
+
 #pragma once
 #include <dsp/stream.h>
 #include <dsp/demod/quadrature.h>
@@ -21,6 +22,13 @@ class FLEXDSP : public dsp::Processor<dsp::complex_t, float> {
     using base_type = dsp::Processor<dsp::complex_t, float>;
 
 public:
+    struct SignalQuality {
+        double envelope = 0.0;
+        double dc_offset = 0.0;
+        bool locked = false;
+        double sample_rate = 0.0;
+    };
+
     FLEXDSP() = default;
 
     explicit FLEXDSP(dsp::stream<dsp::complex_t>* in, double samplerate) {
@@ -46,7 +54,8 @@ public:
             initialized_ = true;
 
             flog::info("FLEX DSP initialized: FM demod (±4500 Hz) + AGC + LP filter (5kHz) at {} Hz", samplerate_);
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("FLEX DSP initialization failed: {}", e.what());
             initialized_ = false;
             throw;
@@ -86,8 +95,8 @@ public:
             }
 
             return count;
-
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             flog::error("FLEX DSP run error: {}", e.what());
             return -1;
         }
@@ -114,7 +123,7 @@ public:
         };
     }
 
-    void reset() noexcept {
+    void reset() noexcept; /*{
         try {
             dcAccumulator_ = 0.0f;
             currentEnvelope_ = 0.0;
@@ -130,14 +139,10 @@ public:
         } catch (const std::exception& e) {
             flog::error("Error during FLEX DSP reset: {}", e.what());
         }
-    }
+    }*/
+    bool isSignalLocked() const noexcept;
 
-    struct SignalQuality {
-        double envelope = 0.0;
-        double dc_offset = 0.0;
-        bool locked = false;
-        double sample_rate = 0.0;
-    };
+    double getEnvelopeSmoothed() const noexcept;
 
 private:
     // DSP chain components (using RAII via dsp:: classes)
@@ -154,15 +159,15 @@ private:
     bool agcLocked_ = false;
 
     // Processing constants
-    static constexpr double FM_DEVIATION = 4500.0;    // FLEX uses ±4.5kHz deviation
-    static constexpr double AGC_SET_POINT = 1.0;      // AGC target amplitude
-    static constexpr double AGC_MAX_GAIN = 10.0;      // Maximum AGC gain
-    static constexpr double AGC_RATE = 1e-3;          // AGC adaptation rate
-    static constexpr double AGC_INIT_GAIN = 1.0;      // Initial AGC gain
-    static constexpr double LP_CUTOFF = 5000.0;       // Low-pass filter cutoff
-    static constexpr double LP_TRANSITION = 6000.0;   // Low-pass filter transition
-    static constexpr float DC_FILTER_ALPHA = 16.0f;   // DC removal filter constant
-    static constexpr float OUTPUT_SCALING = 0.1f;     // Output scaling factor
+    static constexpr double FM_DEVIATION = 4500.0;  // FLEX uses ±4.5kHz deviation
+    static constexpr double AGC_SET_POINT = 1.0;    // AGC target amplitude
+    static constexpr double AGC_MAX_GAIN = 10.0;    // Maximum AGC gain
+    static constexpr double AGC_RATE = 1e-3;        // AGC adaptation rate
+    static constexpr double AGC_INIT_GAIN = 1.0;    // Initial AGC gain
+    static constexpr double LP_CUTOFF = 5000.0;     // Low-pass filter cutoff
+    static constexpr double LP_TRANSITION = 6000.0; // Low-pass filter transition
+    static constexpr float DC_FILTER_ALPHA = 16.0f; // DC removal filter constant
+    static constexpr float OUTPUT_SCALING = 0.1f;   // Output scaling factor
 
     void initializeDemodulationChain(double samplerate) {
         // FM demodulation - FLEX uses ±4.5kHz deviation typically
