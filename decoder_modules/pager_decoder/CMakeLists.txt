@@ -12,10 +12,6 @@ set(SRC
         # FLEX decoder files (old wrapper - will be removed later)
         # Note: flex_next.cpp and flex_next.h are being phased out
 
-        # New FLEX DSP and decoder integration
-        "src/flex/decoder.cpp"
-        "src/flex/dsp.cpp"
-
         # Core flex_next_decoder implementation
         "src/flex/flex_next_decoder/FlexDecoder.cpp"
         "src/flex/flex_next_decoder/FlexDemodulator.cpp"
@@ -36,18 +32,18 @@ set(SRC
 )
 
 # Add the correct BCH implementation based on the global option
-if(FLEX_USE_FULL_BCH)
+if (FLEX_USE_FULL_BCH)
     list(APPEND SRC "src/BCHCode.cpp")
     message(STATUS "Pager Decoder: Using full BCH error correction")
-else()
+else ()
     list(APPEND SRC "src/BCHCode_stub.cpp")
     message(STATUS "Pager Decoder: Using BCH stub (no error correction)")
-endif()
+endif ()
 
 # Check if FlexOutputFormatter.cpp exists (it might be header-only)
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/flex/flex_next_decoder/FlexOutputFormatter.cpp")
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/flex/flex_next_decoder/FlexOutputFormatter.cpp")
     list(APPEND SRC "src/flex/flex_next_decoder/FlexOutputFormatter.cpp")
-endif()
+endif ()
 
 # Create the module using the standard SDR++ module system
 include(${SDRPP_MODULE_CMAKE})
@@ -62,11 +58,11 @@ target_include_directories(pager_decoder PRIVATE
 )
 
 # Configure BCH implementation
-if(FLEX_USE_FULL_BCH)
+if (FLEX_USE_FULL_BCH)
     target_compile_definitions(pager_decoder PRIVATE USE_FULL_BCH=1)
-else()
+else ()
     target_compile_definitions(pager_decoder PRIVATE USE_FULL_BCH=0)
-endif()
+endif ()
 
 # Add C++17 features we're using
 target_compile_features(pager_decoder PRIVATE cxx_std_17)
@@ -78,8 +74,8 @@ message(STATUS "  - Total source files: ${SRC}")
 message(STATUS "  - Include directories: src/, src/flex/, src/flex/flex_next_decoder/, src/pocsag/")
 
 # Verify all source files exist
-foreach(src_file ${SRC})
-    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${src_file}")
+foreach (src_file ${SRC})
+    if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${src_file}")
         message(WARNING "Source file does not exist: ${src_file}")
-    endif()
-endforeach()
+    endif ()
+endforeach ()
