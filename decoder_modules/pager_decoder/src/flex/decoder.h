@@ -26,14 +26,14 @@ public:
                 throw std::runtime_error("Failed to initialize FLEX DSP");
             }
 
-            // Audio handler - receives audio samples for FLEX decoding
-            audioHandler.init(&dsp.out, _audioHandler, this);
-
             // Initialize FLEX decoder with BCH error correction
             initFLEXDecoder();
 
             initialized = true;
             flog::info("FLEX decoder created successfully");
+
+            // Audio handler - receives audio samples for FLEX decoding
+            audioHandler.init(&dsp.out, _audioHandler, this);
         }
         catch (const std::exception& e) {
             flog::error("Failed to create FLEX decoder: {}", e.what());
