@@ -163,20 +163,12 @@ namespace dsp {
 
     private:
         Processor<T, T>* blockBefore(Processor<T, T>* block) {
-            if (!block) {
-                return nullptr;
-            }
-
             // TODO: This is wrong and must be fixed when I get more time
             for (auto& ln : links) {
-                if (ln == block) {
-                    return nullptr;  // First block has no predecessor
-                }
-                if (states[ln]) {
-                    return ln;
-                }
+                if (ln == block) { return NULL; }
+                if (states[ln]) { return ln; }
             }
-            return nullptr;  // CRITICAL FIX: Always return a value
+            return NULL;
         }
 
         Processor<T, T>* blockAfter(Processor<T, T>* block) {

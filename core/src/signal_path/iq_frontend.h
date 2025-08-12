@@ -8,8 +8,6 @@
 #include "../dsp/channel/rx_vfo.h"
 #include "../dsp/sink/handler_sink.h"
 #include "../dsp/math/conjugate.h"
-
-#include <atomic>
 #include <fftw3.h>
 
 class IQFrontEnd {
@@ -49,10 +47,6 @@ public:
     void stop();
 
     double getEffectiveSamplerate();
-
-    // Health monitoring
-    bool isHealthy() const;
-    bool isInitialized() const;
 
 protected:
     static void handler(dsp::complex_t* data, int count, void* ctx);
@@ -109,10 +103,5 @@ protected:
     double effectiveSr;
 
     bool _init = false;
-
-private:
-    mutable std::recursive_mutex frontendMutex;
-    std::atomic<bool> initialized{false};
-    std::atomic<bool> healthy{true};
 
 };
