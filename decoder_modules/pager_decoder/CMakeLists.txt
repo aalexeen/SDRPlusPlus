@@ -5,6 +5,7 @@ project(pager_decoder)
 set(SRC
         # Main module files
         "src/main.cpp"
+        "src/flex/decoder_next.h"
 
         # POCSAG decoder files
         "src/pocsag/pocsag.cpp"

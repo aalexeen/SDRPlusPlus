@@ -7,8 +7,8 @@
 #include <utils/optionlist.h>
 #include <utils/flog.h>
 #include "decoder.h"
+#include "flex/decoder_next.h"
 #include "pocsag/decoder.h"
-#include "flex/decoder.h"
 
 
 SDRPP_MOD_INFO{
@@ -163,7 +163,7 @@ private:
             decoder = new POCSAGDecoder(name, vfo);
             break;
         case DECODER_FLEX:
-            decoder = new FLEXDecoder(name, vfo);
+            decoder = new FLEXDecoderNext(name, vfo);
             break;
         default:
             flog::error("Unknown decoder type: {}", selectedDecoderId);
