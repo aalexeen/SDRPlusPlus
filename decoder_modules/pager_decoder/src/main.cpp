@@ -32,7 +32,7 @@ public:
         config.acquire();
         if (!config.conf.contains(name)) {
             config.conf[name]["selectedDecoder"] = DECODER_POCSAG;
-            config.conf[name]["enabled"] = true;
+            config.conf[name]["enabled"] = false;
         }
         selectedDecoderId = config.conf[name]["selectedDecoder"];
         enabled = config.conf[name]["enabled"];
