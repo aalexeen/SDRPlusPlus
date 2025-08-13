@@ -5,170 +5,171 @@
 
 namespace flex_next_decoder {
 
-/**
- * @class FlexSynchronizer
- * @brief FLEX Protocol Synchronization and Mode Detection
- *
- * Detects FLEX sync patterns and decodes transmission parameters.
- *
- * FLEX Sync Code Structure (64-bit):
- * AAAA:BBBBBBBB:CCCC
- *
- * Where:
- * - BBBBBBBB is always 0xA6C6AAAA (sync marker)
- * - AAAA^CCCC should equal 0xFFFF (error detection)
- * - AAAA determines baud rate and FSK levels
- *
- * Supports both positive and negative (inverted) signal polarity.
- * Uses Hamming distance < 4 for error-tolerant pattern matching.
- */
-class FlexSynchronizer {
-public:
     /**
-     * @brief Constructor
-     */
-    FlexSynchronizer();
-
-    /**
-     * @brief Destructor
-     */
-    ~FlexSynchronizer() = default;
-
-    // Copy and move operations
-    FlexSynchronizer(const FlexSynchronizer&) = default;
-    FlexSynchronizer& operator=(const FlexSynchronizer&) = default;
-    FlexSynchronizer(FlexSynchronizer&&) = default;
-    FlexSynchronizer& operator=(FlexSynchronizer&&) = default;
-
-    //=========================================================================
-    // Main Synchronization Interface
-    //=========================================================================
-
-    /**
-     * @brief Process symbol and detect sync patterns
-     * @param symbol 4-level FSK symbol (0-3)
-     * @return Sync code if detected, 0 if no sync found
+     * @class FlexSynchronizer
+     * @brief FLEX Protocol Synchronization and Mode Detection
      *
-     * Accumulates symbols into 64-bit buffer and checks for FLEX sync patterns.
-     * Automatically detects signal polarity (normal or inverted).
-     */
-    uint32_t processSymbol(uint8_t symbol);
-
-    /**
-     * @brief Decode sync code to transmission parameters
-     * @param sync_code Sync code from processSymbol()
-     * @param sync_info Output structure for decoded parameters
-     * @return true if sync code was recognized, false if unknown
+     * Detects FLEX sync patterns and decodes transmission parameters.
      *
-     * Decodes sync code to determine:
-     * - Baud rate (1600 or 3200 bps)
-     * - FSK levels (2 or 4)
-     * - Signal polarity (normal or inverted)
+     * FLEX Sync Code Structure (64-bit):
+     * AAAA:BBBBBBBB:CCCC
+     *
+     * Where:
+     * - BBBBBBBB is always 0xA6C6AAAA (sync marker)
+     * - AAAA^CCCC should equal 0xFFFF (error detection)
+     * - AAAA determines baud rate and FSK levels
+     *
+     * Supports both positive and negative (inverted) signal polarity.
+     * Uses Hamming distance < 4 for error-tolerant pattern matching.
      */
-    bool decodeSyncMode(uint32_t sync_code, SyncInfo& sync_info);
+    class FlexSynchronizer {
+    public:
+        /**
+         * @brief Constructor
+         */
+        FlexSynchronizer();
 
-    //=========================================================================
-    // State Management
-    //=========================================================================
+        /**
+         * @brief Destructor
+         */
+        ~FlexSynchronizer() = default;
 
-    /**
-     * @brief Reset synchronizer to initial state
-     */
-    void reset();
+        // Copy and move operations
+        FlexSynchronizer(const FlexSynchronizer&) = default;
+        FlexSynchronizer& operator=(const FlexSynchronizer&) = default;
+        FlexSynchronizer(FlexSynchronizer&&) = default;
+        FlexSynchronizer& operator=(FlexSynchronizer&&) = default;
 
-    /**
-     * @brief Get current sync buffer contents (for debugging)
-     * @return Current 64-bit sync buffer
-     */
-    uint64_t getSyncBuffer() const { return sync_buffer_; }
+        //=========================================================================
+        // Main Synchronization Interface
+        //=========================================================================
 
-    /**
-     * @brief Get last detected polarity
-     * @return true if inverted polarity, false if normal
-     */
-    bool getLastPolarity() const { return last_polarity_; }
+        /**
+         * @brief Process symbol and detect sync patterns
+         * @param symbol 4-level FSK symbol (0-3)
+         * @return Sync code if detected, 0 if no sync found
+         *
+         * Accumulates symbols into 64-bit buffer and checks for FLEX sync patterns.
+         * Automatically detects signal polarity (normal or inverted).
+         */
+        uint32_t processSymbol(uint8_t symbol);
 
-    /**
-     * @brief Get symbol count processed since last reset
-     * @return Number of symbols processed
-     */
-    uint32_t getSymbolCount() const { return symbol_count_; }
+        /**
+         * @brief Decode sync code to transmission parameters
+         * @param sync_code Sync code from processSymbol()
+         * @param sync_info Output structure for decoded parameters
+         * @return true if sync code was recognized, false if unknown
+         *
+         * Decodes sync code to determine:
+         * - Baud rate (1600 or 3200 bps)
+         * - FSK levels (2 or 4)
+         * - Signal polarity (normal or inverted)
+         */
+        bool decodeSyncMode(uint32_t sync_code, SyncInfo& sync_info);
 
-    //=========================================================================
-    // Utility Methods
-    //=========================================================================
+        //=========================================================================
+        // State Management
+        //=========================================================================
 
-    /**
-     * @brief Check if a sync code matches known FLEX modes
-     * @param sync_code Sync code to check
-     * @return true if sync code is recognized
-     */
-    static bool isValidSyncCode(uint32_t sync_code);
+        /**
+         * @brief Reset synchronizer to initial state
+         */
+        void reset();
 
-    /**
-     * @brief Get FlexMode for a given sync code
-     * @param sync_code Sync code to look up
-     * @return FlexMode if found, or default mode if not found
-     */
-    static FlexMode getSyncModeInfo(uint32_t sync_code);
+        /**
+         * @brief Get current sync buffer contents (for debugging)
+         * @return Current 64-bit sync buffer
+         */
+        uint64_t getSyncBuffer() const { return sync_buffer_; }
 
-    /**
-     * @brief Count number of differing bits between two values
-     * @param a First value
-     * @param b Second value
-     * @return Hamming distance (number of differing bits)
-     */
-    static uint32_t countBitDifferences(uint32_t a, uint32_t b);
+        /**
+         * @brief Get last detected polarity
+         * @return true if inverted polarity, false if normal
+         */
+        bool getLastPolarity() const { return last_polarity_; }
 
-private:
-    //=========================================================================
-    // Internal Sync Detection Methods
-    //=========================================================================
+        /**
+         * @brief Get symbol count processed since last reset
+         * @return Number of symbols processed
+         */
+        uint32_t getSymbolCount() const { return symbol_count_; }
 
-    /**
-     * @brief Check 64-bit buffer for FLEX sync pattern
-     * @param buffer 64-bit buffer to check
-     * @return Sync code if valid pattern found, 0 otherwise
-     */
-    uint32_t checkSyncPattern(uint64_t buffer) const;
+        //=========================================================================
+        // Utility Methods
+        //=========================================================================
 
-    /**
-     * @brief Validate FLEX sync pattern structure
-     * @param buffer 64-bit sync pattern
-     * @param marker_out Output for extracted marker
-     * @param codehigh_out Output for extracted high code
-     * @param codelow_out Output for extracted low code
-     * @return true if pattern structure is valid
-     */
-    bool validateSyncStructure(uint64_t buffer,
-                              uint32_t& marker_out,
-                              uint16_t& codehigh_out,
-                              uint16_t& codelow_out) const;
+        /**
+         * @brief Check if a sync code matches known FLEX modes
+         * @param sync_code Sync code to check
+         * @return true if sync code is recognized
+         */
+        static bool isValidSyncCode(uint32_t sync_code);
 
-    //=========================================================================
-    // State Variables
-    //=========================================================================
+        /**
+         * @brief Get FlexMode for a given sync code
+         * @param sync_code Sync code to look up
+         * @return FlexMode if found, or default mode if not found
+         */
+        static FlexMode getSyncModeInfo(uint32_t sync_code);
 
-    uint64_t sync_buffer_;           ///< 64-bit rolling sync pattern buffer
-    bool last_polarity_;             ///< Last detected polarity (false=normal, true=inverted)
-    uint32_t symbol_count_;          ///< Number of symbols processed
+        /**
+         * @brief Count number of differing bits between two values
+         * @param a First value
+         * @param b Second value
+         * @return Hamming distance (number of differing bits)
+         */
+        static uint32_t countBitDifferences(uint32_t a, uint32_t b);
 
-    //=========================================================================
-    // Constants
-    //=========================================================================
+    private:
+        //=========================================================================
+        // Internal Sync Detection Methods
+        //=========================================================================
 
-    static constexpr uint32_t SYNC_MARKER = FLEX_SYNC_MARKER;     ///< Expected sync marker value
-    static constexpr int HAMMING_THRESHOLD = 4;                   ///< Max hamming distance for match
-    static constexpr uint16_t OUTER_CODE_XOR = 0xFFFF;           ///< Expected XOR of outer codes
+        /**
+         * @brief Check 64-bit buffer for FLEX sync pattern
+         * @param buffer 64-bit buffer to check
+         * @return Sync code if valid pattern found, 0 otherwise
+         */
+        static uint32_t checkSyncPattern(uint64_t buffer);
 
-    // Sync pattern bit positions in 64-bit word
-    static constexpr int CODEHIGH_SHIFT = 48;                     ///< Upper 16 bits (AAAA)
-    static constexpr int MARKER_SHIFT = 16;                       ///< Middle 32 bits (BBBBBBBB)
-    static constexpr int CODELOW_SHIFT = 0;                       ///< Lower 16 bits (CCCC)
+        /**
+         * @brief Validate FLEX sync pattern structure
+         * @param buffer 64-bit sync pattern
+         * @param marker_out Output for extracted marker
+         * @param codehigh_out Output for extracted high code
+         * @param codelow_out Output for extracted low code
+         * @return true if pattern structure is valid
+         */
+        /*bool validateSyncStructure(uint64_t buffer,
+                                  uint32_t& marker_out,
+                                  uint16_t& codehigh_out,
+                                  uint16_t& codelow_out) const;
+                                  */
 
-    static constexpr uint64_t CODEHIGH_MASK = 0xFFFF000000000000ULL;
-    static constexpr uint64_t MARKER_MASK = 0x0000FFFFFFFF0000ULL;
-    static constexpr uint64_t CODELOW_MASK = 0x000000000000FFFFULL;
-};
+        //=========================================================================
+        // State Variables
+        //=========================================================================
+
+        uint64_t sync_buffer_;  ///< 64-bit rolling sync pattern buffer
+        bool last_polarity_;    ///< Last detected polarity (false=normal, true=inverted)
+        uint32_t symbol_count_; ///< Number of symbols processed
+
+        //=========================================================================
+        // Constants
+        //=========================================================================
+
+        static constexpr uint32_t SYNC_MARKER = FLEX_SYNC_MARKER; ///< Expected sync marker value
+        static constexpr int HAMMING_THRESHOLD = 4;               ///< Max hamming distance for match
+        static constexpr uint16_t OUTER_CODE_XOR = 0xFFFF;        ///< Expected XOR of outer codes
+
+        // Sync pattern bit positions in 64-bit word
+        static constexpr int CODEHIGH_SHIFT = 48; ///< Upper 16 bits (AAAA)
+        static constexpr int MARKER_SHIFT = 16;   ///< Middle 32 bits (BBBBBBBB)
+        static constexpr int CODELOW_SHIFT = 0;   ///< Lower 16 bits (CCCC)
+
+        static constexpr uint64_t CODEHIGH_MASK = 0xFFFF000000000000ULL;
+        static constexpr uint64_t MARKER_MASK = 0x0000FFFFFFFF0000ULL;
+        static constexpr uint64_t CODELOW_MASK = 0x000000000000FFFFULL;
+    };
 
 } // namespace flex_next_decoder

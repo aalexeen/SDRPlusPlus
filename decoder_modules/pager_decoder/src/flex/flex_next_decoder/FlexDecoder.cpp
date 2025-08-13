@@ -119,7 +119,7 @@ namespace flex_next_decoder {
     void FlexDecoder::handleSync1State(uint8_t symbol) {
         // Use FlexSynchronizer to detect sync patterns (from original flex_sync)
         std::cout << typeid(*this).name() << ": " << "handleSync1State called" << std::endl;
-        uint32_t sync_code = synchronizer_->processSymbol(symbol); // ??? Why process?
+        uint32_t sync_code = synchronizer_->processSymbol(symbol); // checked
 
         if (sync_code != 0) {
             // Sync pattern detected - decode transmission mode
@@ -127,10 +127,10 @@ namespace flex_next_decoder {
             if (synchronizer_->decodeSyncMode(sync_code, sync_info)) {
 
                 // Update demodulator with detected baud rate
-                demodulator_->setBaudRate(sync_info.baud_rate);
+                demodulator_->setBaudRate(sync_info.baud_rate); // need to check
 
                 // Configure data collector for transmission mode
-                data_collector_->setTransmissionMode(sync_info.baud_rate, sync_info.levels);
+                data_collector_->setTransmissionMode(sync_info.baud_rate, sync_info.levels); // need to check
 
                 if (verbosity_level_ >= 2) {
                     std::cout << "FLEX_NEXT: SyncInfoWord: sync_code=0x" << std::hex << sync_code
