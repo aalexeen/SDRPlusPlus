@@ -13,31 +13,43 @@
 namespace flex_next_decoder {
 
     FlexDecoder::FlexDecoder(uint32_t sample_frequency)
-        : sample_frequency_(sample_frequency), verbosity_level_(1), fiw_count_(0), fiw_raw_data_(0), sync2_count_(0), data_count_(0) {
+        : sample_frequency_(sample_frequency), verbosity_level_(6), fiw_count_(0), fiw_raw_data_(0), sync2_count_(0), data_count_(0) {
 
         // Initialize all subsystems using RAII (equivalent to original Flex_New)
         try {
+            // State machine with callbacks to coordinate subsystems
+            state_machine_ = std::make_unique<FlexStateMachine>();
+            std::cout << "FLEX_NEXT: StateMachine initialized" << std::endl;
+
             // Core signal processing subsystems
-            demodulator_ = std::make_unique<FlexDemodulator>(sample_frequency);
+            demodulator_ = std::make_unique<FlexDemodulator>(state_machine_.get(), sample_frequency);
+            std::cout << "FLEX_NEXT: Demodulator initialized (sample_freq="
+                      << sample_frequency << ")" << std::endl;
+
             synchronizer_ = std::make_unique<FlexSynchronizer>();
+            std::cout << "FLEX_NEXT: Synchronizer initialized" << std::endl;
             data_collector_ = std::make_unique<FlexDataCollector>();
+            std::cout << "FLEX_NEXT: DataCollector initialized" << std::endl;
 
             // Error correction (equivalent to BCH initialization in original C)
             error_corrector_ = std::make_shared<FlexErrorCorrector>();
-
-            // Message processing subsystems
-            group_handler_ = std::make_shared<FlexGroupHandler>();
-            message_decoder_ = std::make_shared<FlexMessageDecoder>(group_handler_);
+            std::cout << "FLEX_NEXT: ErrorCorrector initialized" << std::endl;
 
             // Frame processing (depends on error corrector and message decoder)
             frame_processor_ = std::make_unique<FlexFrameProcessor>(
                 error_corrector_, message_decoder_, group_handler_);
+            std::cout << "FLEX_NEXT: FrameProcessor initialized" << std::endl;
 
-            // State machine with callbacks to coordinate subsystems
-            state_machine_ = std::make_unique<FlexStateMachine>();
+            // Message processing subsystems
+            group_handler_ = std::make_shared<FlexGroupHandler>();
+            std::cout << "FLEX_NEXT: GroupHandler initialized" << std::endl;
+
+            message_decoder_ = std::make_shared<FlexMessageDecoder>(group_handler_);
+            std::cout << "FLEX_NEXT: MessageDecoder initialized" << std::endl;
 
             // Output formatting
             output_formatter_ = std::make_unique<FlexOutputFormatter>();
+            std::cout << "FLEX_NEXT: OutputFormatter initialized" << std::endl;
 
             if (verbosity_level_ >= 2) {
                 std::cout << "FLEX_NEXT: Decoder initialized (sample_freq="
@@ -67,6 +79,7 @@ namespace flex_next_decoder {
 
     void FlexDecoder::processSingleSample(float sample) {
         // Core coordination function - equivalent to original Flex_Demodulate() call chain
+        std::cout << typeid(*this).name() << ": " << "processSingleSample called" << std::endl;
 
         // Step 1: Signal processing and symbol recovery
         if (demodulator_->processSample(static_cast<double>(sample))) {
@@ -80,6 +93,7 @@ namespace flex_next_decoder {
 
     void FlexDecoder::processSymbol(uint8_t symbol) {
         // Get current state from state machine
+        std::cout << typeid(*this).name() << ": " << "processSymbol called with symbol: " << static_cast<int>(symbol) << std::endl;
         FlexState current_state = state_machine_->getCurrentState();
 
         // State-specific symbol processing (from original flex_sym function)
@@ -104,7 +118,8 @@ namespace flex_next_decoder {
 
     void FlexDecoder::handleSync1State(uint8_t symbol) {
         // Use FlexSynchronizer to detect sync patterns (from original flex_sync)
-        uint32_t sync_code = synchronizer_->processSymbol(symbol);
+        std::cout << typeid(*this).name() << ": " << "handleSync1State called" << std::endl;
+        uint32_t sync_code = synchronizer_->processSymbol(symbol); // ??? Why process?
 
         if (sync_code != 0) {
             // Sync pattern detected - decode transmission mode
@@ -135,6 +150,7 @@ namespace flex_next_decoder {
 
     void FlexDecoder::handleFIWState(uint8_t symbol) {
         // Process Frame Information Word (from original decode_fiw logic)
+        std::cout << typeid(*this).name() << ": " << "handleFIWState called" << std::endl;
         fiw_count_++;
 
         // Skip 16 bits of dotting, then accumulate 32 bits of FIW
@@ -152,6 +168,7 @@ namespace flex_next_decoder {
                 // Extract FIW fields (from original decode_fiw)
                 uint32_t cycle_no = (corrected_fiw >> 4) & 0xF;
                 uint32_t frame_no = (corrected_fiw >> 8) & 0x7F;
+                uint32_t fix3 = (corrected_fiw >> 15) & 0x3F;
 
                 // Validate checksum
                 uint32_t checksum = (corrected_fiw & 0xF) +
@@ -165,7 +182,7 @@ namespace flex_next_decoder {
                     if (verbosity_level_ >= 2) {
                         int time_seconds = cycle_no * 4 * 60 + frame_no * 4 * 60 / 128;
                         std::cout << "FLEX_NEXT: FrameInfoWord: cycleno=" << cycle_no
-                                  << " frameno=" << frame_no
+                                  << " frameno=" << frame_no << " fix3=" << fix3
                                   << " time=" << (time_seconds / 60) << ":" << (time_seconds % 60)
                                   << std::endl;
                     }
@@ -200,6 +217,13 @@ namespace flex_next_decoder {
 
     void FlexDecoder::handleSync2State(uint8_t symbol) {
         // SYNC2 is 25ms of idle bits at current baud rate (from original logic)
+        std::cout << typeid(*this).name() << ": " << "handleSync2State called" << std::endl;
+        if (symbol > 1) {
+            // SYNC2 detected - transition to DATA state
+            state_machine_->changeState(FlexState::Data);
+            data_count_ = 0;
+            data_collector_->reset(); // Clear phase buffers
+        }
         sync2_count_++;
 
         uint32_t baud_rate = demodulator_->getBaudRate();
@@ -219,6 +243,7 @@ namespace flex_next_decoder {
 
     void FlexDecoder::handleDataState(uint8_t symbol) {
         // Process data symbols through data collector (from original read_data)
+        std::cout << typeid(*this).name() << ": " << "handleDataState called" << std::endl;
         bool all_idle = data_collector_->processSymbol(symbol);
         data_count_++;
 

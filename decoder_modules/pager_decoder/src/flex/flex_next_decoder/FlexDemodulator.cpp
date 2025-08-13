@@ -4,16 +4,22 @@
 
 namespace flex_next_decoder {
 
-    FlexDemodulator::FlexDemodulator(uint32_t sample_frequency)
-        : sample_frequency_(sample_frequency), current_baud_(1600) // Always start at 1600 bps (original: flex->Demodulator.baud = 1600)
-          ,
-          last_sample_(0.0), locked_(false), phase_(0), sample_count_(0), symbol_count_(0), zero_offset_(0.0), envelope_(0.0), envelope_sum_(0.0), envelope_count_(0), symbol_rate_(0.0), modal_symbol_(0), lock_buffer_(0), timeout_counter_(0), non_consecutive_counter_(0) {
+    FlexDemodulator::FlexDemodulator(FlexStateMachine* flex_state_machine, uint32_t sample_frequency)
+        : state_machine_(flex_state_machine),
+          sample_frequency_(sample_frequency),
+          current_baud_(1600), // Always start at 1600 bps (original: flex->Demodulator.baud = 1600)
+          last_sample_(0.0), locked_(false), phase_(0),
+          sample_count_(0), symbol_count_(0), zero_offset_(0.0),
+          envelope_(0.0), envelope_sum_(0.0), envelope_count_(0),
+          symbol_rate_(0.0), modal_symbol_(0), lock_buffer_(0),
+          timeout_counter_(0), non_consecutive_counter_(0) {
 
         symbol_counts_.fill(0);
     }
 
     bool FlexDemodulator::processSample(double sample) {
         // Direct equivalent of original buildSymbol() call from Flex_Demodulate()
+        std::cout << typeid(*this).name() << ": " << "processSample called" << std::endl;
         return buildSymbol(sample);
     }
 
@@ -21,15 +27,17 @@ namespace flex_next_decoder {
         // Equivalent to original C code when lock is acquired:
         // flex->Demodulator.symbol_count = 0;
         // flex->Demodulator.sample_count = 0;
+        std::cout << typeid(*this).name() << ": " << "resetCounters called" << std::endl;
         symbol_count_ = 0;
         sample_count_ = 0;
     }
 
     bool FlexDemodulator::buildSymbol(double sample) {
         // Direct port of buildSymbol() function from demod_flex_next.c
+        std::cout << typeid(*this).name() << ": " << "buildSymbol called" << std::endl;
 
-        const int64_t phase_max = 100 * sample_frequency_;
-        const int64_t phase_rate = phase_max * current_baud_ / sample_frequency_;
+        const int64_t phase_max = 100 * sample_frequency_;                        // Maximum value for phase (calculated to divide by sample frequency without remainder)
+        const int64_t phase_rate = phase_max * current_baud_ / sample_frequency_; // Increment per baseband sample
         const double phase_percent = 100.0 * phase_ / phase_max;
 
         // Update the sample counter
@@ -43,7 +51,9 @@ namespace flex_next_decoder {
             // During synchronization, establish signal envelope
             // Note: In original C, this was only during FLEX_STATE_SYNC1
             // but for integration simplicity, we do it when locked
-            updateEnvelope(sample);
+            if (state_machine_->getCurrentState() == FlexState::Sync1) {
+                updateEnvelope(sample);
+            }
         }
         else {
             // Reset and hold in initial state (from original C code)
@@ -53,6 +63,8 @@ namespace flex_next_decoder {
             current_baud_ = 1600;
             timeout_counter_ = 0;
             non_consecutive_counter_ = 0;
+            state_machine_->changeState(FlexState::Sync1);
+            std::cout << typeid(*this).name() << ": " << "resetCounters called" << std::endl;
             // Note: Original C code also set flex->State.Current = FLEX_STATE_SYNC1
             // but that's now handled by FlexStateMachine in your architecture
         }
@@ -84,6 +96,7 @@ namespace flex_next_decoder {
     void FlexDemodulator::updateDCOffset(double sample) {
         // Direct port from original C code:
         // flex->Modulation.zero = (flex->Modulation.zero*(FREQ_SAMP*DC_OFFSET_FILTER) + sample) / ((FREQ_SAMP*DC_OFFSET_FILTER) + 1);
+        std::cout << typeid(*this).name() << ": " << "updateDCOffset called" << std::endl;
         const double filter_term = sample_frequency_ * DC_OFFSET_FILTER;
         zero_offset_ = (zero_offset_ * filter_term + sample) / (filter_term + 1.0);
     }
@@ -93,6 +106,7 @@ namespace flex_next_decoder {
         // flex->Demodulator.envelope_sum += fabs(sample);
         // flex->Demodulator.envelope_count++;
         // flex->Modulation.envelope = flex->Demodulator.envelope_sum / flex->Demodulator.envelope_count;
+        std::cout << typeid(*this).name() << ": " << "updateEnvelope called" << std::endl;
         envelope_sum_ += std::abs(sample);
         envelope_count_++;
         envelope_ = envelope_sum_ / envelope_count_;
@@ -100,6 +114,7 @@ namespace flex_next_decoder {
 
     void FlexDemodulator::countSymbolLevels(double sample, double phase_percent) {
         // Direct port from original C code symbol counting logic
+        std::cout << typeid(*this).name() << ": " << "countSymbolLevels called" << std::endl;
         if (sample > 0.0) {
             if (sample > envelope_ * SLICE_THRESHOLD) {
                 symbol_counts_[3]++; // Level 3 (highest positive)
@@ -120,6 +135,7 @@ namespace flex_next_decoder {
 
     void FlexDemodulator::processZeroCrossing(double sample, double phase_percent, int64_t phase_max) {
         // Direct port of zero crossing logic from original buildSymbol()
+        std::cout << typeid(*this).name() << ": " << "processZeroCrossing called" << std::endl;
         bool zero_crossing = (last_sample_ < 0.0 && sample >= 0.0) ||
                              (last_sample_ >= 0.0 && sample < 0.0);
 
@@ -162,6 +178,7 @@ namespace flex_next_decoder {
         // Combines symbol detection, rate calculation, and lock pattern checking
 
         // Determine the modal symbol (most frequent during symbol period)
+        std::cout << typeid(*this).name() << ": " << "finalizeSymbol called" << std::endl;
         int max_count = 0;
         modal_symbol_ = 0;
 
@@ -205,6 +222,7 @@ namespace flex_next_decoder {
 
         // Shift symbols into buffer, symbols are converted so that max and min symbols map to 1
         // (each contain a single 1 bit)
+        std::cout << typeid(*this).name() << ": " << "checkLockPattern called" << std::endl;
         lock_buffer_ = (lock_buffer_ << 2) | (modal_symbol_ ^ 0x1);
 
         uint64_t lock_pattern = lock_buffer_ ^ LOCK_PATTERN;

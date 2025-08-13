@@ -46,6 +46,7 @@ namespace flex_next_decoder {
     }
 
     void FlexStateMachine::changeState(FlexState new_state) {
+        std::cout << typeid(*this).name() << ": " << "changeState called to state: " << getCurrentStateName() << std::endl;
         if (new_state != current_state_->getStateType()) {
             // ✅ Exit current state
             current_state_->onExit(*this);
@@ -71,6 +72,7 @@ namespace flex_next_decoder {
     }
 
     FlexState FlexStateMachine::getCurrentState() const {
+        std::cout << typeid(*this).name() << ": " << "getCurrentState called - current state: " << getCurrentStateName() << std::endl;
         return current_state_->getStateType();
     }
 
@@ -79,7 +81,7 @@ namespace flex_next_decoder {
     }
 
     void FlexStateMachine::reportStateChange() {
-        std::cout << "FLEX_NEXT: State: " << getCurrentStateName() << std::endl;
+        std::cout << typeid(*this).name() << " FLEX_NEXT: State: " << getCurrentStateName() << std::endl;
     }
 
     //=============================================================================

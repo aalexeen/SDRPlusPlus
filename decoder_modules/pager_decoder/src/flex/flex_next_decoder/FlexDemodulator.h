@@ -1,8 +1,11 @@
 #pragma once
 
+#include "FlexStateMachine.h"
 #include "FlexTypes.h"
 #include <array>
 #include <cstdint>
+#include <iostream>
+#include <ostream>
 
 namespace flex_next_decoder {
 
@@ -33,6 +36,7 @@ namespace flex_next_decoder {
          * @param sample_frequency Input sample rate (typically 22050 Hz)
          */
         explicit FlexDemodulator(uint32_t sample_frequency);
+        FlexDemodulator(FlexStateMachine* flex_state_machine, uint32_t sample_frequency);
 
         /**
          * @brief Destructor - RAII cleanup
@@ -67,7 +71,10 @@ namespace flex_next_decoder {
          * Should be called immediately after processSample() returns true.
          * Pass this symbol to FlexDataCollector::processSymbol() for protocol processing.
          */
-        uint8_t getModalSymbol() const { return modal_symbol_; }
+        uint8_t getModalSymbol() const {
+            std::cout << typeid(*this).name() << "getModalSymbol called" << std::endl;
+            return modal_symbol_;
+        }
 
         //=========================================================================
         // Lock Management (matches original C behavior)
@@ -211,6 +218,7 @@ namespace flex_next_decoder {
         // State Variables (matches original C structures)
         //=========================================================================
 
+        FlexStateMachine* state_machine_; ///< Flex state machine (for callbacks)
         // Configuration
         uint32_t sample_frequency_; ///< flex->Demodulator.sample_freq
         uint32_t current_baud_;     ///< flex->Demodulator.baud

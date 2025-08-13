@@ -13,6 +13,8 @@
 #include "../BCHCode.h" // BCH error correction (up one directory)
 #include "flex_next_decoder/FlexDecoder.h"
 
+#include <iostream>
+
 class FLEXDecoderNext : public Decoder {
 public:
     FLEXDecoderNext(const std::string& name, VFOManager::VFO* vfo) : name(name), vfo(vfo), initialized(false) {
@@ -224,6 +226,7 @@ private:
 
         try {
             flexDecoderNext->processSample(sample);
+            std::cout << typeid(*this).name() << ": processFlexSample called" << std::endl;
         }
         catch (const std::exception& e) {
             flog::error("Error in FLEX sample processing: {}", e.what());
