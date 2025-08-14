@@ -58,6 +58,8 @@ namespace flex_next_decoder {
          */
         uint32_t countBits(uint32_t data) const;
 
+        int verbosity_level_;       ///< Debug output level
+
         /**
          * @brief BCH(31,21,5) error correction engine
          *

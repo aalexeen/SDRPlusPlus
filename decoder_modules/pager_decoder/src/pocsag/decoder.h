@@ -105,4 +105,6 @@ private:
     int brId = 2;
 
     OptionList<int, int> baudrates;
+
+    int verbosity_level_;       ///< Debug output level
 };

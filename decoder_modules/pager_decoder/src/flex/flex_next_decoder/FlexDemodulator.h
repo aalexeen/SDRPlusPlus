@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FlexNextDecoder.h"
 #include "FlexStateMachine.h"
 #include "FlexTypes.h"
 #include <array>
@@ -29,7 +30,7 @@ namespace flex_next_decoder {
      * This class implements only the buildSymbol() logic and related signal processing
      * from the original C code, following your single-responsibility principle.
      */
-    class FlexDemodulator {
+    class FlexDemodulator : public FlexNextDecoder {
     public:
         /**
          * @brief Constructor - initialize demodulator parameters
@@ -37,6 +38,7 @@ namespace flex_next_decoder {
          */
         explicit FlexDemodulator(uint32_t sample_frequency);
         FlexDemodulator(FlexStateMachine* flex_state_machine, uint32_t sample_frequency);
+        FlexDemodulator(FlexStateMachine* flex_state_machine, uint32_t sample_frequency, int verbosity_level);
 
         /**
          * @brief Destructor - RAII cleanup
@@ -245,6 +247,7 @@ namespace flex_next_decoder {
         // Error monitoring
         int timeout_counter_;         ///< flex->Demodulator.timeout
         int non_consecutive_counter_; ///< flex->Demodulator.nonconsec
+
 
         //=========================================================================
         // Constants (from original C #defines)

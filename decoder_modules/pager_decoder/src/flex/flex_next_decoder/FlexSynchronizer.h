@@ -94,6 +94,10 @@ namespace flex_next_decoder {
          */
         uint32_t getSymbolCount() const { return symbol_count_; }
 
+        // uint32_t getSyncBaud() const { return sync_baud; }
+
+        // void setSyncBaud(uint32_t baud) { sync_baud = baud; }
+
         //=========================================================================
         // Utility Methods
         //=========================================================================
@@ -153,6 +157,8 @@ namespace flex_next_decoder {
         uint64_t sync_buffer_;  ///< 64-bit rolling sync pattern buffer
         bool last_polarity_;    ///< Last detected polarity (false=normal, true=inverted)
         uint32_t symbol_count_; ///< Number of symbols processed
+
+        int verbosity_level_;       ///< Debug output level
 
         //=========================================================================
         // Constants

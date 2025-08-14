@@ -150,10 +150,12 @@ namespace flex_next_decoder {
         // Counter access
         uint32_t getFIWCount() const { return fiw_count_; }
         void incrementFIWCount() { ++fiw_count_; }
+        void setFIWCount(uint32_t count) { fiw_count_ = count; }
         void resetFIWCount() { fiw_count_ = 0; }
 
         uint32_t getSync2Count() const { return sync2_count_; }
         void incrementSync2Count() { ++sync2_count_; }
+        void setSync2Count(uint32_t count) { sync2_count_ = count; }
         void resetSync2Count() { sync2_count_ = 0; }
 
         uint32_t getDataCount() const { return data_count_; }
@@ -194,6 +196,8 @@ namespace flex_next_decoder {
 
         // External component callbacks
         FlexStateCallbacks callbacks_;
+
+        int verbosity_level_;       ///< Debug output level
 
         //=========================================================================
         // Helper Methods

@@ -8,7 +8,8 @@ endif ()
 
 # Create shared lib and link to core
 # Only use the ${SRC} variable - each module's CMakeLists.txt populates this
-add_library(${PROJECT_NAME} SHARED ${SRC})
+add_library(${PROJECT_NAME} SHARED ${SRC}
+        decoder_modules/pager_decoder/src/flex/flex_next_decoder/FlexNextDecoder.h)
 target_link_libraries(${PROJECT_NAME} PRIVATE sdrpp_core)
 target_include_directories(${PROJECT_NAME} PRIVATE "${SDRPP_CORE_ROOT}/src/")
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")

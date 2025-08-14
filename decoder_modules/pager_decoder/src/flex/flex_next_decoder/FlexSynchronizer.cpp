@@ -8,7 +8,9 @@ namespace flex_next_decoder {
     }
 
     uint32_t FlexSynchronizer::processSymbol(uint8_t symbol) { // checked
-        std::cout << typeid(*this).name() << ": " << "processSymbol called with symbol: " << static_cast<int>(symbol) << std::endl;
+        if (verbosity_level_ >= 5) {
+            std::cout << typeid(*this).name() << ": " << "processSymbol called with symbol: " << static_cast<int>(symbol) << std::endl;
+        }
         // ✅ Increment symbol counter
         symbol_count_++;
 
@@ -40,7 +42,9 @@ namespace flex_next_decoder {
         // AAAA = upper 16 bits (codehigh)
         // BBBBBBBB = middle 32 bits (marker)
         // CCCC = lower 16 bits (codelow, inverted)
-        std::cout << typeid(*this).name() << ": " << "checkSyncPattern called with buffer: " << std::hex << buffer << std::dec << std::endl;
+        if (verbosity_level_ >= 5) {
+            std::cout << typeid(FlexSynchronizer).name() << ": " << "checkSyncPattern called with buffer: " << std::hex << buffer << std::dec << std::endl;
+        }
 
         uint32_t marker = static_cast<uint32_t>((buffer & MARKER_MASK) >> MARKER_SHIFT);
         uint16_t codehigh = static_cast<uint16_t>((buffer & CODEHIGH_MASK) >> CODEHIGH_SHIFT);
@@ -83,7 +87,7 @@ namespace flex_next_decoder {
         return true; // Structure is always extractable
     }*/
 
-    bool FlexSynchronizer::decodeSyncMode(uint32_t sync_code, SyncInfo& sync_info) { // checked
+    bool FlexSynchronizer::decodeSyncMode(uint32_t sync_code, SyncInfo& sync_info) { // checked (original analog decode_mode
         // ✅ Clear output structure
         sync_info = {};
         sync_info.sync_code = sync_code;
@@ -92,6 +96,7 @@ namespace flex_next_decoder {
         // ✅ Find matching FLEX mode using hamming distance
         for (const auto& mode : FLEX_MODES) {
             if (countBitDifferences(mode.sync_code, sync_code) < HAMMING_THRESHOLD) {
+                sync_info.sync_code = mode.sync_code;
                 sync_info.baud_rate = mode.baud_rate;
                 sync_info.levels = mode.levels;
 

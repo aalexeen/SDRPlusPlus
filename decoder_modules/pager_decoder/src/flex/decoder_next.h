@@ -226,7 +226,9 @@ private:
 
         try {
             flexDecoderNext->processSample(sample);
-            std::cout << typeid(*this).name() << ": processFlexSample called" << std::endl;
+            if (verbosity_level_ >= 5) {
+                std::cout << typeid(*this).name() << ": processFlexSample called" << std::endl;
+            }
         }
         catch (const std::exception& e) {
             flog::error("Error in FLEX sample processing: {}", e.what());
@@ -304,4 +306,7 @@ private:
     bool initialized;
     bool showMessageWindow = false;
     bool autoScrollMessages = true;
+
+    private:
+    int verbosity_level_;       ///< Debug output level
 };

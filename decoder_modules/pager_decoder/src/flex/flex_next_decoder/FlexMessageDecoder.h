@@ -343,6 +343,8 @@ private:
 
     // State management
     bool statistics_enabled_ = true;
+
+    int verbosity_level_;       ///< Debug output level
 };
 
 } // namespace flex_next_decoder

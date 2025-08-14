@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FlexNextDecoder.h"
 #include "FlexTypes.h"
 #include <memory>
 #include <cstdint>
@@ -38,7 +39,7 @@ namespace flex_next_decoder {
      * - Strategy Pattern: FlexMessageDecoder handles different message types
      * - All other patterns: Coordinated through this Facade
      */
-    class FlexDecoder {
+    class FlexDecoder : public FlexNextDecoder {
     public:
         /**
          * @brief Constructor - Initialize all FLEX decoder subsystems
@@ -48,6 +49,16 @@ namespace flex_next_decoder {
          * Uses RAII to automatically manage all subsystem resources.
          */
         explicit FlexDecoder(uint32_t sample_frequency = 22050);
+
+        /**
+         * @brief Constructor - Initialize all FLEX decoder subsystems with specified verbosity level
+         * @param sample_frequency Input sample rate (typically 22050 Hz)
+         * @param verbosity_level Debug output level
+         *
+         * Equivalent to original flex_next_init() + Flex_New().
+         * Uses RAII to automatically manage all subsystem resources.
+         */
+        FlexDecoder(uint32_t sample_frequency, int verbosity_level);
 
         /**
          * @brief Destructor - Automatic cleanup via RAII
@@ -176,8 +187,10 @@ namespace flex_next_decoder {
         /**
          * @brief Handle FIW state - Frame Information Word processing
          * @param symbol Current symbol
+         * @param sym_rectified
+         * @param sync_info
          */
-        void handleFIWState(uint8_t symbol);
+        void handleFIWState(uint8_t symbol, u_char sym_rectified, SyncInfo& sync_info);
 
         /**
          * @brief Handle SYNC2 state - second sync header
@@ -225,13 +238,14 @@ namespace flex_next_decoder {
         //=========================================================================
 
         uint32_t sample_frequency_; ///< Input sample rate
-        int verbosity_level_;       ///< Debug output level
 
         // Frame processing state
         uint32_t fiw_count_;    ///< FIW bit counter
         uint32_t fiw_raw_data_; ///< Accumulated FIW data
         uint32_t sync2_count_;  ///< SYNC2 symbol counter
         uint32_t data_count_;   ///< DATA symbol counter
+
+        SyncInfo sync_info_; ///< Sync pattern info
 
         // Timing parameters (from original C constants)
         static constexpr uint32_t FIW_DOTTING_BITS = 16;   ///< FIW preamble bits

@@ -324,6 +324,8 @@ namespace flex_next_decoder {
         std::function<void(const ProcessedMessage&)> message_callback_;
         bool error_correction_enabled_ = true;
 
+        int verbosity_level_;       ///< Debug output level
+
         //=========================================================================
         // Constants
         //=========================================================================
