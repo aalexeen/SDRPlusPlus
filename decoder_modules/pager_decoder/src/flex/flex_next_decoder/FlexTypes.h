@@ -44,13 +44,13 @@ namespace flex_next_decoder {
         uint32_t levels;
     };
 
-    constexpr std::array<FlexMode, 5> FLEX_MODES = {{
-        {0x870C, 1600, 2},  // 1600 bps, 2-level FSK
-        {0xB068, 1600, 4},  // 1600 bps, 4-level FSK
-        {0x7B18, 3200, 2},  // 3200 bps, 2-level FSK
-        {0xDEA0, 3200, 4},  // 3200 bps, 4-level FSK
-        {0x4C7C, 3200, 4}   // 3200 bps, 4-level FSK (alternate)
-    }};
+    constexpr std::array<FlexMode, 5> FLEX_MODES = { {
+        { 0x870C, 1600, 2 }, // 1600 bps, 2-level FSK
+        { 0xB068, 1600, 4 }, // 1600 bps, 4-level FSK
+        { 0x7B18, 3200, 2 }, // 3200 bps, 2-level FSK
+        { 0xDEA0, 3200, 4 }, // 3200 bps, 4-level FSK
+        { 0x4C7C, 3200, 4 }  // 3200 bps, 4-level FSK (alternate)
+    } };
 
     enum class FlexState : uint8_t {
         Sync1,
@@ -108,7 +108,7 @@ namespace flex_next_decoder {
          * @brief Check if buffer contains only idle patterns
          * @return true if idle count exceeds threshold
          */
-        bool isIdle() const {
+        bool isIdle() const { // checked
             return idle_count > IDLE_THRESHOLD;
         }
 

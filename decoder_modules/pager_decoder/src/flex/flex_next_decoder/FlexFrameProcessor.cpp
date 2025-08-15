@@ -33,7 +33,7 @@ namespace flex_next_decoder {
 
     FrameProcessingResult FlexFrameProcessor::processFrame(const FlexDataCollector& phase_data_collector,
                                                            uint32_t baud_rate, uint32_t fsk_levels,
-                                                           uint32_t cycle_number, uint32_t frame_number) {
+                                                           uint32_t cycle_number, uint32_t frame_number) { // checked
         FrameProcessingResult result;
 
         // Determine which phases to process based on transmission mode
@@ -415,7 +415,7 @@ namespace flex_next_decoder {
         return result;
     }
 
-    std::vector<char> FlexFrameProcessor::getActivePhasesForMode(uint32_t baud_rate, uint32_t fsk_levels) {
+    std::vector<char> FlexFrameProcessor::getActivePhasesForMode(uint32_t baud_rate, uint32_t fsk_levels) { // checked
         // Original algorithm from decode_data()
         std::vector<char> phases;
 

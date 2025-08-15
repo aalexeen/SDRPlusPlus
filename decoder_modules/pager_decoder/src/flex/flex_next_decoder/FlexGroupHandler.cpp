@@ -18,7 +18,7 @@ namespace flex_next_decoder {
 
 
     bool FlexGroupHandler::registerCapcodeToGroup(int64_t capcode, uint32_t vector_word,
-                                                  uint32_t current_cycle, uint32_t current_frame) {
+                                                  uint32_t current_cycle, uint32_t current_frame) { // checked so so
         // Extract group information from Vector Information Word
         // Original: unsigned int iAssignedFrame = (int)((viw >> 10) & 0x7f);
         // Original: int groupbit = (int)((viw >> 17) & 0x7f);
@@ -84,7 +84,7 @@ namespace flex_next_decoder {
         return info;
     }
 
-    std::vector<int> FlexGroupHandler::checkAndCleanupMissedGroups(uint32_t current_cycle, uint32_t current_frame) {
+    std::vector<int> FlexGroupHandler::checkAndCleanupMissedGroups(uint32_t current_cycle, uint32_t current_frame) { // checked so so
         std::vector<int> missed_groups;
 
         // Check each group for missed messages
@@ -146,7 +146,7 @@ namespace flex_next_decoder {
     // Private Methods Implementation
     //=============================================================================
 
-    uint32_t FlexGroupHandler::calculateTargetCycle(uint32_t assigned_frame, uint32_t current_cycle, uint32_t current_frame) const {
+    uint32_t FlexGroupHandler::calculateTargetCycle(uint32_t assigned_frame, uint32_t current_cycle, uint32_t current_frame) const { // checked so so
         // Original algorithm from registerCapcodeToGroup
         // if(iAssignedFrame > flex->FIW.frameno)
         // {

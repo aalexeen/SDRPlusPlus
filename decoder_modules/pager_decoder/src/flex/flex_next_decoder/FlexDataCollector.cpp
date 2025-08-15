@@ -21,7 +21,7 @@ namespace flex_next_decoder {
         // All phase buffers are automatically initialized to zero by PhaseBuffer constructor
     }
 
-    bool FlexDataCollector::processSymbol(uint8_t symbol) {
+    bool FlexDataCollector::processSymbol(uint8_t symbol) { // checked
         // Convert symbol to phase bits according to FSK encoding
         bool bit_a, bit_b;
         symbolToBits(symbol, bit_a, bit_b);
@@ -43,7 +43,7 @@ namespace flex_next_decoder {
         }
 
         // Increment bit counter based on mode
-        if (baud_rate_ == BAUD_1600 || !phase_toggle_) {
+        if (baud_rate_ == BAUD_1600 || !phase_toggle_) { // using struck Sync in original code
             data_bit_counter_++;
         }
 
@@ -82,7 +82,7 @@ namespace flex_next_decoder {
         return status;
     }
 
-    bool FlexDataCollector::areAllActivePhasesIdle() const {
+    bool FlexDataCollector::areAllActivePhasesIdle() const { // checked
         // Determine which phases are active based on transmission mode
         bool idle = false;
 
@@ -125,7 +125,7 @@ namespace flex_next_decoder {
     // Private Methods Implementation
     //=============================================================================
 
-    void FlexDataCollector::symbolToBits(uint8_t symbol, bool& bit_a, bool& bit_b) const {
+    void FlexDataCollector::symbolToBits(uint8_t symbol, bool& bit_a, bool& bit_b) const { // checked
         // Phase A bit: '1' for symbols > 1, '0' otherwise
         bit_a = (symbol > 1);
 
@@ -141,7 +141,7 @@ namespace flex_next_decoder {
         }
     }
 
-    uint32_t FlexDataCollector::calculateBufferIndex() const {
+    uint32_t FlexDataCollector::calculateBufferIndex() const { // checked
         // Original algorithm: ((flex->Data.data_bit_counter>>5)&0xFFF8) | (flex->Data.data_bit_counter&0x0007)
         // This creates a deinterleaving pattern where:
         // Bits 0, 1, and 2 map straight through to give a 0-7 sequence that repeats 32 times
@@ -153,7 +153,7 @@ namespace flex_next_decoder {
         return high_part | low_part;
     }
 
-    void FlexDataCollector::updatePhaseBuffers(bool bit_a, bool bit_b) {
+    void FlexDataCollector::updatePhaseBuffers(bool bit_a, bool bit_b) { // checked
         uint32_t buffer_index = calculateBufferIndex();
 
         // Ensure buffer index is within bounds
@@ -169,9 +169,9 @@ namespace flex_next_decoder {
                                             (bit_b ? MSB_MASK : 0);
 
             // Toggle for 3200 bps interleaving
-            if (baud_rate_ == BAUD_3200) {
-                phase_toggle_ = true;
-            }
+            // if (baud_rate_ == BAUD_3200) {
+            phase_toggle_ = true;
+            //}
         }
         else {
             // Update Phase C and D (3200 bps interleaved)
@@ -184,7 +184,7 @@ namespace flex_next_decoder {
         }
     }
 
-    void FlexDataCollector::checkForIdlePatterns(uint32_t buffer_index) {
+    void FlexDataCollector::checkForIdlePatterns(uint32_t buffer_index) { // checked
         // Only check when a complete 32-bit word has been formed
         if (buffer_index >= PHASE_WORDS) {
             return;
@@ -210,7 +210,7 @@ namespace flex_next_decoder {
         }
     }
 
-    bool FlexDataCollector::isIdlePattern(uint32_t data_word) {
+    bool FlexDataCollector::isIdlePattern(uint32_t data_word) { // checked
         // Idle patterns are all zeros or all ones
         return (data_word == 0x00000000) || (data_word == 0xFFFFFFFF);
     }

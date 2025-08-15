@@ -144,7 +144,7 @@ namespace flex_next_decoder {
         }
     }
 
-    void FlexDecoder::processSymbol(uint8_t symbol) {
+    void FlexDecoder::processSymbol(uint8_t symbol) { // checked, original code flex_sym
         // Get current state from state machine
         if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "processSymbol called with symbol: " << static_cast<int>(symbol) << std::endl;
@@ -285,23 +285,23 @@ namespace flex_next_decoder {
         }
     }
 
-    void FlexDecoder::handleSync2State(uint8_t symbol) {
+    void FlexDecoder::handleSync2State(uint8_t symbol) { // checked
         // SYNC2 is 25ms of idle bits at current baud rate (from original logic)
         if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "handleSync2State called" << std::endl;
         }
-        if (symbol > 1) {
+        /*if (symbol > 1) {
             // SYNC2 detected - transition to DATA state
             state_machine_->changeState(FlexState::Data);
             data_count_ = 0;
             data_collector_->reset(); // Clear phase buffers
-        }
+        }*/
         sync2_count_++;
 
         uint32_t baud_rate = demodulator_->getBaudRate();
         uint32_t sync2_symbols = baud_rate * SYNC2_DURATION_MS / 1000;
 
-        if (sync2_count_ >= sync2_symbols) {
+        if (sync2_count_ == sync2_symbols) { // change >= to == as in original code
             // SYNC2 complete - transition to DATA state
             state_machine_->changeState(FlexState::Data);
             data_count_ = 0;
@@ -313,21 +313,24 @@ namespace flex_next_decoder {
         }
     }
 
-    void FlexDecoder::handleDataState(uint8_t symbol) {
+    void FlexDecoder::handleDataState(uint8_t symbol) { // checked
         // Process data symbols through data collector (from original read_data)
         if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "handleDataState called" << std::endl;
         }
-        bool all_idle = data_collector_->processSymbol(symbol);
+        bool all_idle = data_collector_->processSymbol(symbol); // original code read_data
         data_count_++;
 
         uint32_t baud_rate = demodulator_->getBaudRate();
         uint32_t max_data_symbols = baud_rate * DATA_DURATION_MS / 1000;
 
         // Check for end of data period
-        if (data_count_ >= max_data_symbols || all_idle) {
+        if (data_count_ == max_data_symbols || all_idle) { // change >= to == as in original code
+            if (getVerbosityLevel() >= 4) {
+                std::cout << "FLEX_NEXT: Data count: " << data_count_ << std::endl;
+            }
             // Data collection complete - process the frame
-            processCompletedFrame();
+            processCompletedFrame(); // original code decode_data
 
             // Return to SYNC1 state for next frame
             state_machine_->changeState(FlexState::Sync1);
@@ -336,17 +339,17 @@ namespace flex_next_decoder {
         }
     }
 
-    void FlexDecoder::processCompletedFrame() {
+    void FlexDecoder::processCompletedFrame() { // checked
         // Process completed frame data through frame processor
-        uint32_t baud_rate = demodulator_->getBaudRate();
-        uint32_t fsk_levels = data_collector_->getStatus().fsk_levels;
+        uint32_t baud_rate = demodulator_->getBaudRate();              // original code uses Sync struncture
+        uint32_t fsk_levels = data_collector_->getStatus().fsk_levels; // original code uses Sync struncture
 
         // Extract cycle and frame numbers from last FIW
         uint32_t cycle_no = (fiw_raw_data_ >> 4) & 0xF;
         uint32_t frame_no = (fiw_raw_data_ >> 8) & 0x7F;
 
         // Process frame through all active phases
-        auto result = frame_processor_->processFrame(
+        auto result = frame_processor_->processFrame( // in original code decode_phase
             *data_collector_, baud_rate, fsk_levels, cycle_no, frame_no);
 
         if (getVerbosityLevel() >= 3) {
