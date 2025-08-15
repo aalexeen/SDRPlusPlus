@@ -1,10 +1,14 @@
 #pragma once
 
 #include "FlexTypes.h"
-#include "BCHCode.h"
+#include "../../BCHCode.h"
+#include "FlexNextDecoder.h"
+
 #include <memory>
 #include <cstdint>
 
+
+class BCHCode;
 namespace flex_next_decoder {
 
     /**
@@ -16,13 +20,14 @@ namespace flex_next_decoder {
      *
      * Uses RAII for automatic resource management of BCH code tables.
      */
-    class FlexErrorCorrector {
+    class FlexErrorCorrector : public FlexNextDecoder {
     public:
         /**
          * @brief Constructor - initializes BCH(31,21,5) error correction
          * @throws std::runtime_error if BCH initialization fails
          */
         FlexErrorCorrector();
+        explicit FlexErrorCorrector(int verbosity_level);
 
         /**
          * @brief Destructor - automatically cleans up resources
@@ -58,7 +63,6 @@ namespace flex_next_decoder {
          */
         uint32_t countBits(uint32_t data) const;
 
-        int verbosity_level_;       ///< Debug output level
 
         /**
          * @brief BCH(31,21,5) error correction engine

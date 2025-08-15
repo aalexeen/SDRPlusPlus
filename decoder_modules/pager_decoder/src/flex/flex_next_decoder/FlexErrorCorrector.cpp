@@ -26,6 +26,28 @@ namespace flex_next_decoder {
         }
     }
 
+    FlexErrorCorrector::FlexErrorCorrector(int verbosity_level)
+        : FlexNextDecoder(verbosity_level) {
+        try {
+            // Initialize BCH(31,21,5) code with FLEX-specific parameters
+            // Generator polynomial: x^5 + x^2 + 1 = 100101 binary
+            std::array<int, 6> polynomial = { 1, 0, 1, 0, 0, 1 };
+
+            // BCH parameters for FLEX protocol:
+            // m=5 (field order), n=31 (code length), k=21 (data length), t=2 (error capability)
+            bch_code_ = std::make_unique<BCHCode>(
+                polynomial.data(), // Generator polynomial coefficients
+                5,                 // Field order (GF(2^5))
+                31,                // Code length
+                21,                // Data length
+                2                  // Error correction capability
+            );
+        }
+        catch (const std::exception& e) {
+            throw std::runtime_error("Failed to initialize BCH error corrector: " + std::string(e.what()));
+        }
+    }
+
     bool FlexErrorCorrector::fixErrors(uint32_t& data, char phase_id) {
         // Convert 32-bit data word to BCH coefficient array format
         // Extract bits from MSB to LSB (bit 30 down to bit 0)

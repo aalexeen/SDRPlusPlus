@@ -33,7 +33,7 @@ namespace flex_next_decoder {
 
     bool FlexDemodulator::processSample(double sample) {
         // Direct equivalent of original buildSymbol() call from Flex_Demodulate()
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "processSample called" << std::endl;
         }
         return buildSymbol(sample);
@@ -43,7 +43,7 @@ namespace flex_next_decoder {
         // Equivalent to original C code when lock is acquired:
         // flex->Demodulator.symbol_count = 0;
         // flex->Demodulator.sample_count = 0;
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "resetCounters called" << std::endl;
         }
         symbol_count_ = 0;
@@ -52,7 +52,7 @@ namespace flex_next_decoder {
 
     bool FlexDemodulator::buildSymbol(double sample) {
         // Direct port of buildSymbol() function from demod_flex_next.c
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "buildSymbol called" << std::endl;
         }
         const int64_t phase_max = 100 * sample_frequency_;                        // Maximum value for phase (calculated to divide by sample frequency without remainder)
@@ -83,7 +83,7 @@ namespace flex_next_decoder {
             timeout_counter_ = 0;
             non_consecutive_counter_ = 0;
             state_machine_->changeState(FlexState::Sync1);
-            if (verbosity_level_ >= 5) {
+            if (getVerbosityLevel() >= 5) {
                 std::cout << typeid(*this).name() << ": " << "resetCounters called" << std::endl;
             }
             // Note: Original C code also set flex->State.Current = FLEX_STATE_SYNC1
@@ -117,7 +117,7 @@ namespace flex_next_decoder {
     void FlexDemodulator::updateDCOffset(double sample) {
         // Direct port from original C code:
         // flex->Modulation.zero = (flex->Modulation.zero*(FREQ_SAMP*DC_OFFSET_FILTER) + sample) / ((FREQ_SAMP*DC_OFFSET_FILTER) + 1);
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "updateDCOffset called" << std::endl;
         }
         const double filter_term = sample_frequency_ * DC_OFFSET_FILTER;
@@ -129,7 +129,7 @@ namespace flex_next_decoder {
         // flex->Demodulator.envelope_sum += fabs(sample);
         // flex->Demodulator.envelope_count++;
         // flex->Modulation.envelope = flex->Demodulator.envelope_sum / flex->Demodulator.envelope_count;
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "updateEnvelope called" << std::endl;
         }
         envelope_sum_ += std::abs(sample);
@@ -139,7 +139,7 @@ namespace flex_next_decoder {
 
     void FlexDemodulator::countSymbolLevels(double sample, double phase_percent) {
         // Direct port from original C code symbol counting logic
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "countSymbolLevels called" << std::endl;
         }
         if (sample > 0.0) {
@@ -162,7 +162,7 @@ namespace flex_next_decoder {
 
     void FlexDemodulator::processZeroCrossing(double sample, double phase_percent, int64_t phase_max) {
         // Direct port of zero crossing logic from original buildSymbol()
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "processZeroCrossing called" << std::endl;
         }
         bool zero_crossing = (last_sample_ < 0.0 && sample >= 0.0) ||
@@ -207,7 +207,7 @@ namespace flex_next_decoder {
         // Combines symbol detection, rate calculation, and lock pattern checking
 
         // Determine the modal symbol (most frequent during symbol period)
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "finalizeSymbol called" << std::endl;
         }
         int max_count = 0;
@@ -253,7 +253,7 @@ namespace flex_next_decoder {
 
         // Shift symbols into buffer, symbols are converted so that max and min symbols map to 1
         // (each contain a single 1 bit)
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "checkLockPattern called" << std::endl;
         }
         lock_buffer_ = (lock_buffer_ << 2) | (modal_symbol_ ^ 0x1);

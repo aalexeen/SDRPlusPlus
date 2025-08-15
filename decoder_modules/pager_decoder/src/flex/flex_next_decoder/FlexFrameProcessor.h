@@ -158,7 +158,7 @@ namespace flex_next_decoder {
      * 6. Message parsing and dispatch
      * 7. Multi-phase coordination based on transmission mode
      */
-    class FlexFrameProcessor {
+    class FlexFrameProcessor : public FlexNextDecoder {
     public:
         /**
          * @brief Constructor
@@ -169,6 +169,11 @@ namespace flex_next_decoder {
         FlexFrameProcessor(std::shared_ptr<FlexErrorCorrector> error_corrector,
                            std::shared_ptr<FlexMessageDecoder> message_decoder,
                            std::shared_ptr<FlexGroupHandler> group_handler);
+
+        FlexFrameProcessor(std::shared_ptr<FlexErrorCorrector> error_corrector,
+                           std::shared_ptr<FlexMessageDecoder> message_decoder,
+                           std::shared_ptr<FlexGroupHandler> group_handler,
+                           int verbosity_level);
 
         /**
          * @brief Destructor
@@ -323,8 +328,6 @@ namespace flex_next_decoder {
 
         std::function<void(const ProcessedMessage&)> message_callback_;
         bool error_correction_enabled_ = true;
-
-        int verbosity_level_;       ///< Debug output level
 
         //=========================================================================
         // Constants

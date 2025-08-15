@@ -12,8 +12,8 @@
 
 namespace flex_next_decoder {
 
-    FlexDecoder::FlexDecoder(uint32_t sample_frequency)
-        : sample_frequency_(sample_frequency), verbosity_level_(2), fiw_count_(0), fiw_raw_data_(0), sync2_count_(0), data_count_(0) {
+    /*FlexDecoder::FlexDecoder(uint32_t sample_frequency)
+        : sample_frequency_(sample_frequency), getVerbosityLevel()(2), fiw_count_(0), fiw_raw_data_(0), sync2_count_(0), data_count_(0) {
 
         // Initialize all subsystems using RAII (equivalent to original Flex_New)
         try {
@@ -51,7 +51,7 @@ namespace flex_next_decoder {
             output_formatter_ = std::make_unique<FlexOutputFormatter>();
             std::cout << "FLEX_NEXT: OutputFormatter initialized" << std::endl;
 
-            if (verbosity_level_ >= 2) {
+            if (getVerbosityLevel() >= 2) {
                 std::cout << "FLEX_NEXT: Decoder initialized (sample_freq="
                           << sample_frequency << ")" << std::endl;
             }
@@ -60,7 +60,7 @@ namespace flex_next_decoder {
             std::cerr << "FLEX_NEXT: Failed to initialize decoder: " << e.what() << std::endl;
             throw;
         }
-    }
+    }*/
 
     FlexDecoder::FlexDecoder(uint32_t sample_frequency, int verbosity_level)
         : FlexNextDecoder(verbosity_level) // Initialize base class with specified verbosity level
@@ -74,7 +74,7 @@ namespace flex_next_decoder {
             std::cout << "FLEX_NEXT: StateMachine initialized" << std::endl;
 
             // Core signal processing subsystems
-            demodulator_ = std::make_unique<FlexDemodulator>(state_machine_.get(), sample_frequency);
+            demodulator_ = std::make_unique<FlexDemodulator>(state_machine_.get(), sample_frequency, verbosity_level);
             std::cout << "FLEX_NEXT: Demodulator initialized (sample_freq="
                       << sample_frequency << ")" << std::endl;
 
@@ -84,26 +84,26 @@ namespace flex_next_decoder {
             std::cout << "FLEX_NEXT: DataCollector initialized" << std::endl;
 
             // Error correction (equivalent to BCH initialization in original C)
-            error_corrector_ = std::make_shared<FlexErrorCorrector>();
+            error_corrector_ = std::make_shared<FlexErrorCorrector>(verbosity_level);
             std::cout << "FLEX_NEXT: ErrorCorrector initialized" << std::endl;
 
             // Frame processing (depends on error corrector and message decoder)
             frame_processor_ = std::make_unique<FlexFrameProcessor>(
-                error_corrector_, message_decoder_, group_handler_);
+                error_corrector_, message_decoder_, group_handler_, verbosity_level);
             std::cout << "FLEX_NEXT: FrameProcessor initialized" << std::endl;
 
             // Message processing subsystems
-            group_handler_ = std::make_shared<FlexGroupHandler>();
+            group_handler_ = std::make_shared<FlexGroupHandler>(verbosity_level);
             std::cout << "FLEX_NEXT: GroupHandler initialized" << std::endl;
 
-            message_decoder_ = std::make_shared<FlexMessageDecoder>(group_handler_);
+            message_decoder_ = std::make_shared<FlexMessageDecoder>(group_handler_, verbosity_level);
             std::cout << "FLEX_NEXT: MessageDecoder initialized" << std::endl;
 
             // Output formatting
-            output_formatter_ = std::make_unique<FlexOutputFormatter>();
+            output_formatter_ = std::make_unique<FlexOutputFormatter>(verbosity_level);
             std::cout << "FLEX_NEXT: OutputFormatter initialized" << std::endl;
 
-            if (verbosity_level_ >= 2) {
+            if (getVerbosityLevel() >= 2) {
                 std::cout << "FLEX_NEXT: Decoder initialized (sample_freq="
                           << sample_frequency << ")" << std::endl;
             }
@@ -131,7 +131,7 @@ namespace flex_next_decoder {
 
     void FlexDecoder::processSingleSample(float sample) {
         // Core coordination function - equivalent to original Flex_Demodulate() call chain
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "processSingleSample called" << std::endl;
         }
         // Step 1: Signal processing and symbol recovery
@@ -146,7 +146,7 @@ namespace flex_next_decoder {
 
     void FlexDecoder::processSymbol(uint8_t symbol) {
         // Get current state from state machine
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "processSymbol called with symbol: " << static_cast<int>(symbol) << std::endl;
         }
         FlexState current_state = state_machine_->getCurrentState();
@@ -174,7 +174,7 @@ namespace flex_next_decoder {
 
     void FlexDecoder::handleSync1State(uint8_t symbol) { // checked
         // Use FlexSynchronizer to detect sync patterns (from original flex_sync)
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "handleSync1State called" << std::endl;
         }
         uint32_t sync_code = synchronizer_->processSymbol(symbol); // checked
@@ -189,7 +189,7 @@ namespace flex_next_decoder {
                 // Configure data collector for transmission mode
                 // data_collector_->setTransmissionMode(sync_info.baud_rate, sync_info.levels); // it is no necessary in original code
 
-                if (verbosity_level_ >= 2) {
+                if (getVerbosityLevel() >= 2) {
                     std::cout << "FLEX_NEXT: SyncInfoWord: sync_code=0x" << std::hex << sync_code
                               << " baud=" << sync_info_.baud_rate
                               << " levels=" << sync_info_.levels
@@ -215,7 +215,7 @@ namespace flex_next_decoder {
 
     void FlexDecoder::handleFIWState(uint8_t symbol, u_char sym_rectified, SyncInfo& sync_info) { // checked so so
         // Process Frame Information Word (from original decode_fiw logic)
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "handleFIWState called" << std::endl;
         }
         fiw_count_++;
@@ -247,7 +247,7 @@ namespace flex_next_decoder {
                                     ((corrected_fiw >> 20) & 0x01);
 
                 if ((checksum & 0xF) == 0xF) {
-                    if (verbosity_level_ >= 2) {
+                    if (getVerbosityLevel() >= 2) {
                         int time_seconds = cycle_no * 4 * 60 + frame_no * 4 * 60 / 128;
                         std::cout << "FLEX_NEXT: FrameInfoWord: cycleno=" << cycle_no
                                   << " frameno=" << frame_no << " fix3=" << fix3
@@ -258,7 +258,7 @@ namespace flex_next_decoder {
                     // Check for missed group messages
                     std::vector<int> missed_groups = group_handler_->checkAndCleanupMissedGroups(cycle_no, frame_no);
                     for (int group_bit : missed_groups) {
-                        if (verbosity_level_ >= 3) {
+                        if (getVerbosityLevel() >= 3) {
                             std::cout << "FLEX_NEXT: Missed group message for group bit " << group_bit << std::endl;
                         }
                     }
@@ -270,14 +270,14 @@ namespace flex_next_decoder {
                     demodulator_->setBaudRate(sync_info_.baud_rate); // Reset to default
                 }
                 else {
-                    if (verbosity_level_ >= 3) {
+                    if (getVerbosityLevel() >= 3) {
                         std::cout << "FLEX_NEXT: Bad FIW checksum" << std::endl;
                     }
                     state_machine_->changeState(FlexState::Sync1);
                 }
             }
             else {
-                if (verbosity_level_ >= 3) {
+                if (getVerbosityLevel() >= 3) {
                     std::cout << "FLEX_NEXT: Unable to decode FIW, too much data corruption" << std::endl;
                 }
                 state_machine_->changeState(FlexState::Sync1);
@@ -287,7 +287,7 @@ namespace flex_next_decoder {
 
     void FlexDecoder::handleSync2State(uint8_t symbol) {
         // SYNC2 is 25ms of idle bits at current baud rate (from original logic)
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "handleSync2State called" << std::endl;
         }
         if (symbol > 1) {
@@ -307,7 +307,7 @@ namespace flex_next_decoder {
             data_count_ = 0;
             data_collector_->reset(); // Clear phase buffers
 
-            if (verbosity_level_ >= 2) {
+            if (getVerbosityLevel() >= 2) {
                 std::cout << "FLEX_NEXT: State: DATA" << std::endl;
             }
         }
@@ -315,7 +315,7 @@ namespace flex_next_decoder {
 
     void FlexDecoder::handleDataState(uint8_t symbol) {
         // Process data symbols through data collector (from original read_data)
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "handleDataState called" << std::endl;
         }
         bool all_idle = data_collector_->processSymbol(symbol);
@@ -349,7 +349,7 @@ namespace flex_next_decoder {
         auto result = frame_processor_->processFrame(
             *data_collector_, baud_rate, fsk_levels, cycle_no, frame_no);
 
-        if (verbosity_level_ >= 3) {
+        if (getVerbosityLevel() >= 3) {
             std::cout << "FLEX_NEXT: Frame processing complete: "
                       << result.successful_messages << "/" << result.total_messages
                       << " messages decoded" << std::endl;
@@ -372,7 +372,7 @@ namespace flex_next_decoder {
         sync2_count_ = 0;
         data_count_ = 0;
 
-        if (verbosity_level_ >= 2) {
+        if (getVerbosityLevel() >= 2) {
             std::cout << "FLEX_NEXT: Decoder reset" << std::endl;
         }
     }
@@ -381,7 +381,7 @@ namespace flex_next_decoder {
         // Update base class verbosity level
         FlexNextDecoder::setVerbosityLevel(level);
         // Propagate to subsystems that support verbosity
-        // (Individual subsystems can check verbosity_level_ via getter if needed)
+        // (Individual subsystems can check getVerbosityLevel() via getter if needed)
     }
 
     FlexState FlexDecoder::getCurrentState() const {

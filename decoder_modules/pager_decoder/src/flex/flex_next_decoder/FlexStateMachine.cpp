@@ -19,6 +19,12 @@ namespace flex_next_decoder {
         initializeStates();
     }
 
+    FlexStateMachine::FlexStateMachine(const FlexStateCallbacks& callbacks, int verbosity_level)
+        : FlexNextDecoder(verbosity_level), previous_state_(FlexState::Sync1), fiw_count_(0), sync2_count_(0), data_count_(0), baud_rate_(1600), fiw_raw_data_(0), callbacks_(callbacks) {
+
+        initializeStates();
+    }
+
     void FlexStateMachine::initializeStates() {
         // ✅ Create all state objects
         states_[0] = std::make_unique<Sync1State>();

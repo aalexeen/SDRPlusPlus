@@ -7,8 +7,12 @@ namespace flex_next_decoder {
         : sync_buffer_(0), last_polarity_(false), symbol_count_(0) {
     }
 
+    FlexSynchronizer::FlexSynchronizer(int verbosity_level)
+        : FlexNextDecoder(verbosity_level), sync_buffer_(0), last_polarity_(false), symbol_count_(0) {
+    }
+
     uint32_t FlexSynchronizer::processSymbol(uint8_t symbol) { // checked
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "processSymbol called with symbol: " << static_cast<int>(symbol) << std::endl;
         }
         // ✅ Increment symbol counter
@@ -42,7 +46,7 @@ namespace flex_next_decoder {
         // AAAA = upper 16 bits (codehigh)
         // BBBBBBBB = middle 32 bits (marker)
         // CCCC = lower 16 bits (codelow, inverted)
-        if (verbosity_level_ >= 5) {
+        if (getVerbosityLevel() >= 5) {
             std::cout << typeid(FlexSynchronizer).name() << ": " << "checkSyncPattern called with buffer: " << std::hex << buffer << std::dec << std::endl;
         }
 

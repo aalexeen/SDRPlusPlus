@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FlexNextDecoder.h"
 #include "FlexTypes.h"
 #include <memory>
 #include <array>
@@ -79,7 +80,7 @@ namespace flex_next_decoder {
      * Delegates symbol processing to current state object.
      * States can access context data and trigger transitions.
      */
-    class FlexStateMachine {
+    class FlexStateMachine : public FlexNextDecoder {
     public:
         /**
          * @brief Constructor with callbacks for external component interaction
@@ -91,6 +92,8 @@ namespace flex_next_decoder {
          * @brief Default constructor (callbacks must be set later)
          */
         FlexStateMachine();
+
+        FlexStateMachine(const FlexStateCallbacks& callbacks, int verbosity_level);
 
         /**
          * @brief Destructor
@@ -196,8 +199,6 @@ namespace flex_next_decoder {
 
         // External component callbacks
         FlexStateCallbacks callbacks_;
-
-        int verbosity_level_;       ///< Debug output level
 
         //=========================================================================
         // Helper Methods

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FlexNextDecoder.h"
 #include "FlexTypes.h"
 #include <array>
 #include <vector>
@@ -80,12 +81,14 @@ struct GroupMessageInfo {
  * Group capcode range: 2029568-2029583 (16 group bits + 1 for indexing)
  * Each group can contain up to 1000 capcodes
  */
-class FlexGroupHandler {
+class FlexGroupHandler : public FlexNextDecoder {
 public:
     /**
      * @brief Constructor
      */
     FlexGroupHandler();
+
+    explicit FlexGroupHandler(int verbosity_level);
 
     /**
      * @brief Destructor
@@ -206,7 +209,6 @@ private:
      */
     void clearGroup(int group_bit);
 
-    int verbosity_level_;       ///< Debug output level
 
     //=========================================================================
     // State Variables

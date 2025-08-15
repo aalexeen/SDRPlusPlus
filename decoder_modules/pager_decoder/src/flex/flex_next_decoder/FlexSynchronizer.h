@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FlexNextDecoder.h"
 #include "FlexTypes.h"
 #include <cstdint>
 
@@ -22,12 +23,14 @@ namespace flex_next_decoder {
      * Supports both positive and negative (inverted) signal polarity.
      * Uses Hamming distance < 4 for error-tolerant pattern matching.
      */
-    class FlexSynchronizer {
+    class FlexSynchronizer : public FlexNextDecoder {
     public:
         /**
          * @brief Constructor
          */
         FlexSynchronizer();
+
+        FlexSynchronizer(int verbosity_level);
 
         /**
          * @brief Destructor
@@ -134,7 +137,7 @@ namespace flex_next_decoder {
          * @param buffer 64-bit buffer to check
          * @return Sync code if valid pattern found, 0 otherwise
          */
-        static uint32_t checkSyncPattern(uint64_t buffer);
+        uint32_t checkSyncPattern(uint64_t buffer);
 
         /**
          * @brief Validate FLEX sync pattern structure
@@ -157,8 +160,6 @@ namespace flex_next_decoder {
         uint64_t sync_buffer_;  ///< 64-bit rolling sync pattern buffer
         bool last_polarity_;    ///< Last detected polarity (false=normal, true=inverted)
         uint32_t symbol_count_; ///< Number of symbols processed
-
-        int verbosity_level_;       ///< Debug output level
 
         //=========================================================================
         // Constants

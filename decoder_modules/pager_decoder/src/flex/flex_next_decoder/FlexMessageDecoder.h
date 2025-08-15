@@ -13,6 +13,7 @@
 #include <vector>
 #include <utility>
 #include <functional>
+#include "FlexNextDecoder.h"
 
 namespace flex_next_decoder {
 
@@ -123,13 +124,15 @@ struct FragmentBuffer {
  * - Error handling and recovery
  * - Message validation and post-processing
  */
-class FlexMessageDecoder {
+class FlexMessageDecoder : public FlexNextDecoder {
 public:
     /**
      * @brief Constructor - initializes all message parsers
      * @param group_handler Optional group handler for group message processing
      */
     FlexMessageDecoder(std::shared_ptr<FlexGroupHandler> group_handler = nullptr);
+
+    FlexMessageDecoder(std::shared_ptr<FlexGroupHandler> group_handler = nullptr, int verbosity_level = 2);
 
     /**
      * @brief Destructor - automatic cleanup via RAII
@@ -343,8 +346,6 @@ private:
 
     // State management
     bool statistics_enabled_ = true;
-
-    int verbosity_level_;       ///< Debug output level
 };
 
 } // namespace flex_next_decoder
