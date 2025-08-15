@@ -30,6 +30,7 @@ public:
                 throw std::runtime_error("Failed to initialize FLEX DSP");
             }
 
+
             // Initialize FLEX decoder with BCH error correction
             initFLEXDecoder();
 
@@ -243,11 +244,19 @@ private:
             bchDecoder = std::make_unique<BCHCode>(primitive_poly, 5, 31, 21, 2);
 
             // Initialize FLEX decoder next
-            flexDecoderNext = std::make_unique<flex_next_decoder::FlexDecoder>(PAGER_AUDIO_SAMPLERATE);
+            flexDecoderNext = std::make_unique<flex_next_decoder::FlexDecoder>(
+                static_cast<uint32_t>(PAGER_AUDIO_SAMPLERATE),
+                verbosity_level_);
             /*flexDecoderNext->setMessageCallback([this](int64_t addr, int type, const std::string& data) {
                 handleFlexMessage(addr, type, data);
             });*/
             // Configure decoder settings
+            if (!flexDecoderNext) {
+                std::cout << "Failed to create FlexDecoder instance" << std::endl;
+                return;
+            }
+
+
             flexDecoderNext->setVerbosityLevel(2); // Set debug level
 
             flog::info("FLEX decoder (new implementation) initialized");
@@ -307,6 +316,6 @@ private:
     bool showMessageWindow = false;
     bool autoScrollMessages = true;
 
-    private:
-    int verbosity_level_;       ///< Debug output level
+private:
+    int verbosity_level_ = 2; ///< Debug output level
 };
