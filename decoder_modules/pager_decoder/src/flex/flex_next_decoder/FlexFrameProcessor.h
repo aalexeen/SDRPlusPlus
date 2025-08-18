@@ -19,17 +19,15 @@ namespace flex_next_decoder {
     struct BlockInfoWord {
         uint32_t raw_data = 0;
         uint32_t address_offset = 0; // Start of address words (1-4)
-        uint32_t vector_offset = 0;  // Start of vector words (1-63)
-        uint32_t max_pages = 0;      // Maximum possible pages in frame
+        uint32_t vector_offset = 0; // Start of vector words (1-63)
+        uint32_t max_pages = 0; // Maximum possible pages in frame
         bool is_valid = false;
 
         /**
          * @brief Check if BIW contains valid data
          * @return true if BIW is valid
          */
-        bool isValid() const {
-            return is_valid && vector_offset > address_offset && max_pages > 0;
-        }
+        bool isValid() const { return is_valid && vector_offset > address_offset && max_pages > 0; }
     };
 
     /**
@@ -48,9 +46,7 @@ namespace flex_next_decoder {
          * @brief Check if AIW is valid
          * @return true if capcode is within valid range
          */
-        bool isValid() const {
-            return is_valid && capcode >= 0 && capcode <= MAX_CAPCODE;
-        }
+        bool isValid() const { return is_valid && capcode >= 0 && capcode <= MAX_CAPCODE; }
     };
 
     /**
@@ -61,31 +57,27 @@ namespace flex_next_decoder {
         uint32_t raw_data = 0;
         MessageType message_type = MessageType::Tone;
         uint32_t message_word_start = 0; // Start of message data
-        uint32_t message_length = 0;     // Length in words
-        uint32_t header_word_index = 0;  // Header word location
-        uint32_t fragment_number = 0;    // Fragment info (0-3)
-        bool continuation_flag = false;  // Continuation flag
+        uint32_t message_length = 0; // Length in words
+        uint32_t header_word_index = 0; // Header word location
+        uint32_t fragment_number = 0; // Fragment info (0-3)
+        bool continuation_flag = false; // Continuation flag
         bool is_valid = false;
 
         // Short Instruction specific fields
         uint32_t assigned_frame = 0; // Target frame for group message
-        int group_bit_target = -1;   // Target group bit for registration
+        int group_bit_target = -1; // Target group bit for registration
 
         /**
          * @brief Check if VIW is valid
          * @return true if VIW has valid structure
          */
-        bool isValid() const {
-            return is_valid;
-        }
+        bool isValid() const { return is_valid; }
 
         /**
          * @brief Check if this is a Short Instruction message
          * @return true if message type is Short Instruction
          */
-        bool isShortInstruction() const {
-            return message_type == MessageType::ShortInstruction;
-        }
+        bool isShortInstruction() const { return message_type == MessageType::ShortInstruction; }
     };
 
     /**
@@ -97,15 +89,13 @@ namespace flex_next_decoder {
         VectorInfoWord vector_info;
         MessageParseResult parse_result;
         uint32_t phase_index = 0; // Which phase this came from
-        char phase_name = 'A';    // Phase name ('A', 'B', 'C', 'D')
+        char phase_name = 'A'; // Phase name ('A', 'B', 'C', 'D')
 
         /**
          * @brief Check if message processing was successful
          * @return true if all components are valid
          */
-        bool isValid() const {
-            return address_info.isValid() && vector_info.isValid() && parse_result.success;
-        }
+        bool isValid() const { return address_info.isValid() && vector_info.isValid() && parse_result.success; }
     };
 
     /**
@@ -124,7 +114,7 @@ namespace flex_next_decoder {
          * @brief Add error message to result
          * @param error Error description
          */
-        void addError(const std::string& error) {
+        void addError(const std::string &error) {
             errors.push_back(error);
             has_errors = true;
         }
@@ -133,14 +123,10 @@ namespace flex_next_decoder {
          * @brief Add processed message to result
          * @param message Processed message
          */
-        void addMessage(ProcessedMessage&& message) {
+        void addMessage(ProcessedMessage &&message) {
             total_messages++;
-            if (message.isValid()) {
-                successful_messages++;
-            }
-            if (message.vector_info.isShortInstruction()) {
-                short_instructions++;
-            }
+            if (message.isValid()) { successful_messages++; }
+            if (message.vector_info.isShortInstruction()) { short_instructions++; }
             messages.emplace_back(std::move(message));
         }
     };
@@ -172,8 +158,7 @@ namespace flex_next_decoder {
 
         FlexFrameProcessor(std::shared_ptr<FlexErrorCorrector> error_corrector,
                            std::shared_ptr<FlexMessageDecoder> message_decoder,
-                           std::shared_ptr<FlexGroupHandler> group_handler,
-                           int verbosity_level);
+                           std::shared_ptr<FlexGroupHandler> group_handler, int verbosity_level);
 
         /**
          * @brief Destructor
@@ -181,12 +166,12 @@ namespace flex_next_decoder {
         ~FlexFrameProcessor() = default;
 
         // Delete copy operations (manages shared state)
-        FlexFrameProcessor(const FlexFrameProcessor&) = delete;
-        FlexFrameProcessor& operator=(const FlexFrameProcessor&) = delete;
+        FlexFrameProcessor(const FlexFrameProcessor &) = delete;
+        FlexFrameProcessor &operator=(const FlexFrameProcessor &) = delete;
 
         // Allow move operations
-        FlexFrameProcessor(FlexFrameProcessor&&) = default;
-        FlexFrameProcessor& operator=(FlexFrameProcessor&&) = default;
+        FlexFrameProcessor(FlexFrameProcessor &&) = default;
+        FlexFrameProcessor &operator=(FlexFrameProcessor &&) = default;
 
         //=========================================================================
         // Frame Processing Interface
@@ -201,9 +186,8 @@ namespace flex_next_decoder {
          * @param frame_number Current frame number (0-127)
          * @return Frame processing results with all extracted messages
          */
-        FrameProcessingResult processFrame(const FlexDataCollector& phase_data_collector,
-                                           uint32_t baud_rate, uint32_t fsk_levels,
-                                           uint32_t cycle_number, uint32_t frame_number);
+        FrameProcessingResult processFrame(const FlexDataCollector &phase_data_collector, uint32_t baud_rate,
+                                           uint32_t fsk_levels, uint32_t cycle_number, uint32_t frame_number);
 
         /**
          * @brief Process single phase data
@@ -213,10 +197,8 @@ namespace flex_next_decoder {
          * @param frame_number Current frame number
          * @return Vector of processed messages from this phase
          */
-        std::vector<ProcessedMessage> processPhase(const PhaseBuffer& phase_buffer,
-                                                   char phase_name,
-                                                   uint32_t cycle_number,
-                                                   uint32_t frame_number);
+        std::vector<ProcessedMessage> processPhase(const PhaseBuffer &phase_buffer, char phase_name,
+                                                   uint32_t cycle_number, uint32_t frame_number);
 
         //=========================================================================
         // Configuration
@@ -226,7 +208,7 @@ namespace flex_next_decoder {
          * @brief Set message output callback for real-time processing
          * @param callback Function called for each processed message
          */
-        void setMessageCallback(std::function<void(const ProcessedMessage&)> callback);
+        void setMessageCallback(std::function<void(const ProcessedMessage &)> callback);
 
         /**
          * @brief Enable or disable BCH error correction
@@ -245,14 +227,15 @@ namespace flex_next_decoder {
          * @param phase_name Phase identifier for logging
          * @return true if error correction succeeded
          */
-        bool applyErrorCorrection(std::vector<uint32_t>& phase_data, char phase_name);
+        bool applyErrorCorrection(std::vector<uint32_t> &phase_data, char phase_name);
 
         /**
          * @brief Extract and validate Block Information Word
          * @param phase_data Phase buffer data
+         * @param phase_name
          * @return Decoded BIW structure
          */
-        BlockInfoWord extractBlockInfoWord(const std::vector<uint32_t>& phase_data);
+        BlockInfoWord extractBlockInfoWord(const std::vector<uint32_t> &phase_data, char phase_name);
 
         /**
          * @brief Process Address Information Word
@@ -269,8 +252,7 @@ namespace flex_next_decoder {
          * @param header_word Header word for fragment info
          * @return Decoded VIW structure
          */
-        VectorInfoWord processVectorInfoWord(uint32_t raw_viw,
-                                             const AddressInfoWord& address_info,
+        VectorInfoWord processVectorInfoWord(uint32_t raw_viw, const AddressInfoWord &address_info,
                                              uint32_t header_word);
 
         /**
@@ -281,8 +263,7 @@ namespace flex_next_decoder {
          * @param frame_number Current frame
          * @return true if registration succeeded
          */
-        bool handleShortInstruction(const AddressInfoWord& address_info,
-                                    const VectorInfoWord& vector_info,
+        bool handleShortInstruction(const AddressInfoWord &address_info, const VectorInfoWord &vector_info,
                                     uint32_t cycle_number, uint32_t frame_number);
 
         /**
@@ -294,10 +275,9 @@ namespace flex_next_decoder {
          * @param frame_number Current frame
          * @return Message parsing result
          */
-        MessageParseResult parseMessageContent(const AddressInfoWord& address_info,
-                                               const VectorInfoWord& vector_info,
-                                               const std::vector<uint32_t>& phase_data,
-                                               uint32_t cycle_number, uint32_t frame_number);
+        MessageParseResult parseMessageContent(const AddressInfoWord &address_info, const VectorInfoWord &vector_info,
+                                               const std::vector<uint32_t> &phase_data, uint32_t cycle_number,
+                                               uint32_t frame_number);
 
         //=========================================================================
         // Utility Methods
@@ -326,16 +306,16 @@ namespace flex_next_decoder {
         std::shared_ptr<FlexMessageDecoder> message_decoder_;
         std::shared_ptr<FlexGroupHandler> group_handler_;
 
-        std::function<void(const ProcessedMessage&)> message_callback_;
+        std::function<void(const ProcessedMessage &)> message_callback_;
         bool error_correction_enabled_ = true;
 
         //=========================================================================
         // Constants
         //=========================================================================
 
-        static constexpr uint32_t MESSAGE_BITS_MASK = 0x1FFFFF;      // 21-bit message mask
-        static constexpr uint32_t BIW_ADDRESS_OFFSET_MASK = 0x3;     // Bits 9-8
-        static constexpr uint32_t BIW_VECTOR_OFFSET_MASK = 0x3F;     // Bits 15-10
+        static constexpr uint32_t MESSAGE_BITS_MASK = 0x1FFFFF; // 21-bit message mask
+        static constexpr uint32_t BIW_ADDRESS_OFFSET_MASK = 0x3; // Bits 9-8
+        static constexpr uint32_t BIW_VECTOR_OFFSET_MASK = 0x3F; // Bits 15-10
         static constexpr uint32_t AIW_SHORT_ADDRESS_OFFSET = 0x8000; // Short address offset
         static constexpr int64_t LONG_ADDRESS_THRESHOLD_1 = 0x8001;
         static constexpr int64_t LONG_ADDRESS_THRESHOLD_2_LOW = 0x1E0000;

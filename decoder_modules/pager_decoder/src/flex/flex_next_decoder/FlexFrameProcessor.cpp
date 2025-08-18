@@ -10,28 +10,25 @@ namespace flex_next_decoder {
 
     FlexFrameProcessor::FlexFrameProcessor(std::shared_ptr<FlexErrorCorrector> error_corrector,
                                            std::shared_ptr<FlexMessageDecoder> message_decoder,
-                                           std::shared_ptr<FlexGroupHandler> group_handler)
-        : error_corrector_(std::move(error_corrector)), message_decoder_(std::move(message_decoder)), group_handler_(std::move(group_handler)) {
+                                           std::shared_ptr<FlexGroupHandler> group_handler) :
+        error_corrector_(std::move(error_corrector)), message_decoder_(std::move(message_decoder)),
+        group_handler_(std::move(group_handler)) {
 
         // Configure message decoder with group handler if both are available
-        if (message_decoder_ && group_handler_) {
-            message_decoder_->setGroupHandler(group_handler_);
-        }
+        if (message_decoder_ && group_handler_) { message_decoder_->setGroupHandler(group_handler_); }
     }
 
     FlexFrameProcessor::FlexFrameProcessor(std::shared_ptr<FlexErrorCorrector> error_corrector,
                                            std::shared_ptr<FlexMessageDecoder> message_decoder,
-                                           std::shared_ptr<FlexGroupHandler> group_handler,
-                                           int verbosity_level)
-        : FlexNextDecoder(verbosity_level), error_corrector_(std::move(error_corrector)), message_decoder_(std::move(message_decoder)), group_handler_(std::move(group_handler)) {
+                                           std::shared_ptr<FlexGroupHandler> group_handler, int verbosity_level) :
+        FlexNextDecoder(verbosity_level), error_corrector_(std::move(error_corrector)),
+        message_decoder_(std::move(message_decoder)), group_handler_(std::move(group_handler)) {
 
         // Configure message decoder with group handler if both are available
-        if (message_decoder_ && group_handler_) {
-            message_decoder_->setGroupHandler(group_handler_);
-        }
+        if (message_decoder_ && group_handler_) { message_decoder_->setGroupHandler(group_handler_); }
     }
 
-    FrameProcessingResult FlexFrameProcessor::processFrame(const FlexDataCollector& phase_data_collector,
+    FrameProcessingResult FlexFrameProcessor::processFrame(const FlexDataCollector &phase_data_collector,
                                                            uint32_t baud_rate, uint32_t fsk_levels,
                                                            uint32_t cycle_number, uint32_t frame_number) { // checked
         FrameProcessingResult result;
@@ -40,26 +37,26 @@ namespace flex_next_decoder {
         std::vector<char> active_phases = getActivePhasesForMode(baud_rate, fsk_levels);
 
         // Process each active phase
-        for (char phase_name : active_phases) {
-            const PhaseBuffer* phase_buffer = nullptr;
+        for (char phase_name: active_phases) {
+            const PhaseBuffer *phase_buffer = nullptr;
 
             // Get appropriate phase buffer
             switch (phase_name) {
-            case 'A':
-                phase_buffer = &phase_data_collector.getPhaseA();
-                break;
-            case 'B':
-                phase_buffer = &phase_data_collector.getPhaseB();
-                break;
-            case 'C':
-                phase_buffer = &phase_data_collector.getPhaseC();
-                break;
-            case 'D':
-                phase_buffer = &phase_data_collector.getPhaseD();
-                break;
-            default:
-                result.addError("Invalid phase name: " + std::string(1, phase_name));
-                continue;
+                case 'A':
+                    phase_buffer = &phase_data_collector.getPhaseA();
+                    break;
+                case 'B':
+                    phase_buffer = &phase_data_collector.getPhaseB();
+                    break;
+                case 'C':
+                    phase_buffer = &phase_data_collector.getPhaseC();
+                    break;
+                case 'D':
+                    phase_buffer = &phase_data_collector.getPhaseD();
+                    break;
+                default:
+                    result.addError("Invalid phase name: " + std::string(1, phase_name));
+                    continue;
             }
 
             if (phase_buffer == nullptr) {
@@ -69,15 +66,12 @@ namespace flex_next_decoder {
 
             // Process this phase
             try {
-                std::vector<ProcessedMessage> phase_messages = processPhase(*phase_buffer, phase_name,
-                                                                            cycle_number, frame_number);
+                std::vector<ProcessedMessage> phase_messages =
+                        processPhase(*phase_buffer, phase_name, cycle_number, frame_number);
 
                 // Add messages to result
-                for (auto& message : phase_messages) {
-                    result.addMessage(std::move(message));
-                }
-            }
-            catch (const std::exception& e) {
+                for (auto &message: phase_messages) { result.addMessage(std::move(message)); }
+            } catch (const std::exception &e) {
                 result.addError("Exception processing phase " + std::string(1, phase_name) + ": " + e.what());
             }
         }
@@ -85,10 +79,8 @@ namespace flex_next_decoder {
         return result;
     }
 
-    std::vector<ProcessedMessage> FlexFrameProcessor::processPhase(const PhaseBuffer& phase_buffer,
-                                                                   char phase_name,
-                                                                   uint32_t cycle_number,
-                                                                   uint32_t frame_number) {
+    std::vector<ProcessedMessage> FlexFrameProcessor::processPhase(const PhaseBuffer &phase_buffer, char phase_name,
+                                                                   uint32_t cycle_number, uint32_t frame_number) {
         std::vector<ProcessedMessage> messages;
 
         // Copy phase data for error correction
@@ -101,7 +93,7 @@ namespace flex_next_decoder {
         }
 
         // Extract Block Information Word
-        BlockInfoWord biw = extractBlockInfoWord(phase_data);
+        BlockInfoWord biw = extractBlockInfoWord(phase_data, phase_name);
         if (!biw.isValid()) {
             return messages; // No valid data in this phase
         }
@@ -135,8 +127,7 @@ namespace flex_next_decoder {
                 if (aiw.long_address && vector_index + 1 < phase_data.size()) {
                     header_index = vector_index + 1;
                     header_word = phase_data[header_index];
-                }
-                else if (!aiw.long_address) {
+                } else if (!aiw.long_address) {
                     // Header is within the message - we'll extract it during VIW processing
                     header_word = 0; // Will be set in processVectorInfoWord
                 }
@@ -170,8 +161,7 @@ namespace flex_next_decoder {
                 }
 
                 // Parse message content
-                MessageParseResult parse_result = parseMessageContent(aiw, viw, phase_data,
-                                                                      cycle_number, frame_number);
+                MessageParseResult parse_result = parseMessageContent(aiw, viw, phase_data, cycle_number, frame_number);
 
                 // Create processed message
                 ProcessedMessage message;
@@ -182,18 +172,13 @@ namespace flex_next_decoder {
                 message.phase_name = phase_name;
 
                 // Call message callback if set
-                if (message_callback_) {
-                    message_callback_(message);
-                }
+                if (message_callback_) { message_callback_(message); }
 
                 messages.push_back(std::move(message));
 
                 // Skip next address word if this was a long address
-                if (aiw.long_address) {
-                    i++;
-                }
-            }
-            catch (const std::exception& e) {
+                if (aiw.long_address) { i++; }
+            } catch (const std::exception &e) {
                 // Continue processing other messages even if one fails
                 continue;
             }
@@ -202,19 +187,17 @@ namespace flex_next_decoder {
         return messages;
     }
 
-    void FlexFrameProcessor::setMessageCallback(std::function<void(const ProcessedMessage&)> callback) {
+    void FlexFrameProcessor::setMessageCallback(std::function<void(const ProcessedMessage &)> callback) {
         message_callback_ = std::move(callback);
     }
 
-    void FlexFrameProcessor::setErrorCorrectionEnabled(bool enabled) {
-        error_correction_enabled_ = enabled;
-    }
+    void FlexFrameProcessor::setErrorCorrectionEnabled(bool enabled) { error_correction_enabled_ = enabled; }
 
     //=============================================================================
     // Private Methods Implementation
     //=============================================================================
 
-    bool FlexFrameProcessor::applyErrorCorrection(std::vector<uint32_t>& phase_data, char phase_name) {
+    bool FlexFrameProcessor::applyErrorCorrection(std::vector<uint32_t> &phase_data, char phase_name) {
         if (!error_corrector_) {
             return true; // No error corrector available, assume data is clean
         }
@@ -236,7 +219,7 @@ namespace flex_next_decoder {
         return success;
     }
 
-    BlockInfoWord FlexFrameProcessor::extractBlockInfoWord(const std::vector<uint32_t>& phase_data) {
+    BlockInfoWord FlexFrameProcessor::extractBlockInfoWord(const std::vector<uint32_t> &phase_data, char phase_name) {
         BlockInfoWord biw;
 
         if (phase_data.empty()) {
@@ -258,8 +241,15 @@ namespace flex_next_decoder {
         biw.vector_offset = (biw.raw_data >> 10) & BIW_VECTOR_OFFSET_MASK;
 
         // Validate structure
-        if (biw.vector_offset <= biw.address_offset) {
+        if (biw.vector_offset < biw.address_offset) {
+            if (verbosity_level_ >= 1) { std::cout << "Invalid structure: " << biw.raw_data << std::endl; }
             return biw; // Invalid structure
+        }
+
+        if (verbosity_level_ >= 2) {
+            std::cout << "FLEX_NEXT: BlockInfoWord: (Phase " << phase_name << ") BIW:" << std::hex << biw.raw_data
+                      << " AW " << std::dec << biw.address_offset << " VW " << biw.vector_offset << " (up to "
+                      << biw.max_pages << " pages)" << std::endl;
         }
 
         biw.max_pages = biw.vector_offset - biw.address_offset;
@@ -283,8 +273,7 @@ namespace flex_next_decoder {
             aiw.capcode = next_word ^ MESSAGE_BITS_MASK;
             aiw.capcode = aiw.capcode << 15;
             aiw.capcode += LONG_ADDRESS_CONSTANT + raw_aiw;
-        }
-        else {
+        } else {
             // Short address calculation
             aiw.capcode = raw_aiw - AIW_SHORT_ADDRESS_OFFSET;
         }
@@ -309,8 +298,7 @@ namespace flex_next_decoder {
         return aiw;
     }
 
-    VectorInfoWord FlexFrameProcessor::processVectorInfoWord(uint32_t raw_viw,
-                                                             const AddressInfoWord& address_info,
+    VectorInfoWord FlexFrameProcessor::processVectorInfoWord(uint32_t raw_viw, const AddressInfoWord &address_info,
                                                              uint32_t header_word) {
         VectorInfoWord viw;
         viw.raw_data = raw_viw;
@@ -335,8 +323,7 @@ namespace flex_next_decoder {
             if (viw.message_length >= 1) {
                 viw.message_length--; // Per PDW
             }
-        }
-        else {
+        } else {
             // Header is within the message
             viw.header_word_index = viw.message_word_start;
             viw.message_word_start++;
@@ -352,8 +339,7 @@ namespace flex_next_decoder {
         }
 
         // Validate message bounds
-        if (viw.message_length > 0 &&
-            viw.message_word_start + viw.message_length <= PHASE_WORDS) {
+        if (viw.message_length > 0 && viw.message_word_start + viw.message_length <= PHASE_WORDS) {
             viw.is_valid = true;
         }
 
@@ -367,23 +353,20 @@ namespace flex_next_decoder {
         return viw;
     }
 
-    bool FlexFrameProcessor::handleShortInstruction(const AddressInfoWord& address_info,
-                                                    const VectorInfoWord& vector_info,
-                                                    uint32_t cycle_number, uint32_t frame_number) {
-        if (!group_handler_ || !vector_info.isShortInstruction()) {
-            return false;
-        }
+    bool FlexFrameProcessor::handleShortInstruction(const AddressInfoWord &address_info,
+                                                    const VectorInfoWord &vector_info, uint32_t cycle_number,
+                                                    uint32_t frame_number) {
+        if (!group_handler_ || !vector_info.isShortInstruction()) { return false; }
 
         // Register capcode to group using original vector word format
         uint32_t vector_word = (vector_info.group_bit_target << 17) | (vector_info.assigned_frame << 10);
 
-        return group_handler_->registerCapcodeToGroup(address_info.capcode, vector_word,
-                                                      cycle_number, frame_number);
+        return group_handler_->registerCapcodeToGroup(address_info.capcode, vector_word, cycle_number, frame_number);
     }
 
-    MessageParseResult FlexFrameProcessor::parseMessageContent(const AddressInfoWord& address_info,
-                                                               const VectorInfoWord& vector_info,
-                                                               const std::vector<uint32_t>& phase_data,
+    MessageParseResult FlexFrameProcessor::parseMessageContent(const AddressInfoWord &address_info,
+                                                               const VectorInfoWord &vector_info,
+                                                               const std::vector<uint32_t> &phase_data,
                                                                uint32_t cycle_number, uint32_t frame_number) {
         if (!message_decoder_) {
             MessageParseResult result;
@@ -422,16 +405,13 @@ namespace flex_next_decoder {
         if (baud_rate == 1600) {
             if (fsk_levels == 2) {
                 phases = { 'A' };
-            }
-            else {
+            } else {
                 phases = { 'A', 'B' };
             }
-        }
-        else {
+        } else {
             if (fsk_levels == 2) {
                 phases = { 'A', 'C' };
-            }
-            else {
+            } else {
                 phases = { 'A', 'B', 'C', 'D' };
             }
         }
@@ -439,8 +419,6 @@ namespace flex_next_decoder {
         return phases;
     }
 
-    bool FlexFrameProcessor::isValidCapcode(int64_t capcode) {
-        return capcode >= 0 && capcode <= MAX_CAPCODE;
-    }
+    bool FlexFrameProcessor::isValidCapcode(int64_t capcode) { return capcode >= 0 && capcode <= MAX_CAPCODE; }
 
 } // namespace flex_next_decoder
