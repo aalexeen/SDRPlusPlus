@@ -130,14 +130,14 @@ public:
      * @brief Constructor - initializes all message parsers
      * @param group_handler Optional group handler for group message processing
      */
-    FlexMessageDecoder(std::shared_ptr<FlexGroupHandler> group_handler = nullptr);
+    FlexMessageDecoder(std::shared_ptr<FlexGroupHandler> group_handler);
 
-    FlexMessageDecoder(std::shared_ptr<FlexGroupHandler> group_handler = nullptr, int verbosity_level = 2);
+    FlexMessageDecoder(std::shared_ptr<FlexGroupHandler> group_handler, int verbosity_level);
 
     /**
      * @brief Destructor - automatic cleanup via RAII
      */
-    ~FlexMessageDecoder() = default;
+    ~FlexMessageDecoder() override = default;
 
     // Delete copy operations (unique_ptr members)
     FlexMessageDecoder(const FlexMessageDecoder&) = delete;

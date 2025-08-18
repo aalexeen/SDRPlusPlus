@@ -12,8 +12,8 @@
 
 namespace flex_next_decoder {
 
-    /*FlexDecoder::FlexDecoder(uint32_t sample_frequency)
-        : sample_frequency_(sample_frequency), getVerbosityLevel()(2), fiw_count_(0), fiw_raw_data_(0), sync2_count_(0), data_count_(0) {
+    FlexDecoder::FlexDecoder(uint32_t sample_frequency)
+        : FlexNextDecoder(2), sample_frequency_(sample_frequency), fiw_count_(0), fiw_raw_data_(0), sync2_count_(0), data_count_(0) {
 
         // Initialize all subsystems using RAII (equivalent to original Flex_New)
         try {
@@ -60,7 +60,7 @@ namespace flex_next_decoder {
             std::cerr << "FLEX_NEXT: Failed to initialize decoder: " << e.what() << std::endl;
             throw;
         }
-    }*/
+    }
 
     FlexDecoder::FlexDecoder(uint32_t sample_frequency, int verbosity_level)
         : FlexNextDecoder(verbosity_level) // Initialize base class with specified verbosity level
@@ -70,7 +70,7 @@ namespace flex_next_decoder {
         // Initialize all subsystems using RAII (equivalent to original Flex_New)
         try {
             // State machine with callbacks to coordinate subsystems
-            state_machine_ = std::make_unique<FlexStateMachine>();
+            state_machine_ = std::make_unique<FlexStateMachine>(verbosity_level);
             std::cout << "FLEX_NEXT: StateMachine initialized" << std::endl;
 
             // Core signal processing subsystems
@@ -100,7 +100,7 @@ namespace flex_next_decoder {
             std::cout << "FLEX_NEXT: MessageDecoder initialized" << std::endl;
 
             // Output formatting
-            output_formatter_ = std::make_unique<FlexOutputFormatter>(verbosity_level);
+            output_formatter_ = std::make_unique<FlexOutputFormatter>();
             std::cout << "FLEX_NEXT: OutputFormatter initialized" << std::endl;
 
             if (getVerbosityLevel() >= 2) {

@@ -3,8 +3,7 @@
 #include <iostream>
 
 namespace flex_next_decoder {
-
-    FlexDemodulator::FlexDemodulator(FlexStateMachine* flex_state_machine, uint32_t sample_frequency)
+    FlexDemodulator::FlexDemodulator(FlexStateMachine *flex_state_machine, uint32_t sample_frequency)
         : state_machine_(flex_state_machine),
           sample_frequency_(sample_frequency),
           current_baud_(1600), // Always start at 1600 bps (original: flex->Demodulator.baud = 1600)
@@ -13,11 +12,11 @@ namespace flex_next_decoder {
           envelope_(0.0), envelope_sum_(0.0), envelope_count_(0),
           symbol_rate_(0.0), modal_symbol_(0), lock_buffer_(0),
           timeout_counter_(0), non_consecutive_counter_(0) {
-
         symbol_counts_.fill(0);
     }
 
-    FlexDemodulator::FlexDemodulator(FlexStateMachine* flex_state_machine, uint32_t sample_frequency, int verbosity_level)
+    FlexDemodulator::FlexDemodulator(FlexStateMachine *flex_state_machine, uint32_t sample_frequency,
+                                     int verbosity_level)
         : FlexNextDecoder(verbosity_level), // Initialize base class with specified verbosity level
           state_machine_(flex_state_machine),
           sample_frequency_(sample_frequency),
@@ -27,7 +26,6 @@ namespace flex_next_decoder {
           envelope_(0.0), envelope_sum_(0.0), envelope_count_(0),
           symbol_rate_(0.0), modal_symbol_(0), lock_buffer_(0),
           timeout_counter_(0), non_consecutive_counter_(0) {
-
         symbol_counts_.fill(0);
     }
 
@@ -55,7 +53,8 @@ namespace flex_next_decoder {
         if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "buildSymbol called" << std::endl;
         }
-        const int64_t phase_max = 100 * sample_frequency_;                        // Maximum value for phase (calculated to divide by sample frequency without remainder)
+        const int64_t phase_max = 100 * sample_frequency_;
+        // Maximum value for phase (calculated to divide by sample frequency without remainder)
         const int64_t phase_rate = phase_max * current_baud_ / sample_frequency_; // Increment per baseband sample
         const double phase_percent = 100.0 * phase_ / phase_max;
 
@@ -73,8 +72,7 @@ namespace flex_next_decoder {
             if (state_machine_->getCurrentState() == FlexState::Sync1) {
                 updateEnvelope(sample);
             }
-        }
-        else {
+        } else {
             // Reset and hold in initial state (from original C code)
             envelope_ = 0.0;
             envelope_sum_ = 0.0;
@@ -145,16 +143,13 @@ namespace flex_next_decoder {
         if (sample > 0.0) {
             if (sample > envelope_ * SLICE_THRESHOLD) {
                 symbol_counts_[3]++; // Level 3 (highest positive)
-            }
-            else {
+            } else {
                 symbol_counts_[2]++; // Level 2 (low positive)
             }
-        }
-        else {
+        } else {
             if (sample < -envelope_ * SLICE_THRESHOLD) {
                 symbol_counts_[0]++; // Level 0 (lowest negative)
-            }
-            else {
+            } else {
                 symbol_counts_[1]++; // Level 1 (low negative)
             }
         }
@@ -173,16 +168,14 @@ namespace flex_next_decoder {
             double phase_error;
             if (phase_percent < 50.0) {
                 phase_error = phase_;
-            }
-            else {
+            } else {
                 phase_error = phase_ - phase_max;
             }
 
             // Phase lock with the signal
             if (locked_) {
                 phase_ -= static_cast<int64_t>(phase_error * PHASE_LOCKED_RATE);
-            }
-            else {
+            } else {
                 phase_ -= static_cast<int64_t>(phase_error * PHASE_UNLOCKED_RATE);
             }
 
@@ -193,8 +186,7 @@ namespace flex_next_decoder {
                     std::cout << "FLEX_NEXT: Synchronisation Lost\n";
                     locked_ = false;
                 }
-            }
-            else {
+            } else {
                 non_consecutive_counter_ = 0;
             }
 
@@ -234,8 +226,7 @@ namespace flex_next_decoder {
             // Symbol is ready for processing by FlexDataCollector
             // In original C code, this called flex_sym(flex, modal_symbol)
             // but that's now handled by your FlexDataCollector::processSymbol()
-        }
-        else {
+        } else {
             // Check for lock pattern when not locked
             checkLockPattern();
         }
@@ -270,5 +261,4 @@ namespace flex_next_decoder {
             resetCounters();
         }
     }
-
 } // namespace flex_next_decoder

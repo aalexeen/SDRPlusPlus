@@ -66,7 +66,7 @@ namespace flex_next_decoder {
          * Equivalent to original flex_next_deinit() + Flex_Delete().
          * All subsystems automatically cleaned up via unique_ptr.
          */
-        ~FlexDecoder();
+        ~FlexDecoder() override;
 
         // Non-copyable but moveable (manages unique decoder state)
         FlexDecoder(const FlexDecoder&) = delete;

@@ -83,22 +83,24 @@ namespace flex_next_decoder {
     class FlexStateMachine : public FlexNextDecoder {
     public:
         /**
+        * @brief Default constructor (callbacks must be set later)
+        */
+        FlexStateMachine();
+
+        /**
          * @brief Constructor with callbacks for external component interaction
          * @param callbacks Functions for interacting with other FLEX components
          */
         explicit FlexStateMachine(const FlexStateCallbacks& callbacks);
 
-        /**
-         * @brief Default constructor (callbacks must be set later)
-         */
-        FlexStateMachine();
 
         FlexStateMachine(const FlexStateCallbacks& callbacks, int verbosity_level);
+        FlexStateMachine(int verbosity_level);
 
         /**
          * @brief Destructor
          */
-        ~FlexStateMachine() = default;
+        ~FlexStateMachine() override = default;
 
         // Delete copy operations (unique_ptr members)
         FlexStateMachine(const FlexStateMachine&) = delete;

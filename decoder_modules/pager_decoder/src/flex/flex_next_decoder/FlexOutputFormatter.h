@@ -30,8 +30,6 @@ namespace flex_next_decoder {
                                  char fragment_flag) const;
 
         std::string getMessageTypeString(MessageType type) const;
-
-        int verbosity_level_; ///< Debug output level
     };
 
 } // namespace flex_next_decoder

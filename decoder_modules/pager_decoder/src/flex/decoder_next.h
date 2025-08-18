@@ -46,7 +46,7 @@ public:
         }
     }
 
-    ~FLEXDecoderNext() {
+    ~FLEXDecoderNext() override {
         stop();
     }
 
@@ -317,5 +317,5 @@ private:
     bool autoScrollMessages = true;
 
 private:
-    int verbosity_level_ = 2; ///< Debug output level
+    int verbosity_level_ = 1; ///< Debug output level
 };

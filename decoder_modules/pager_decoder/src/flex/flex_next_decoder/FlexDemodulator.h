@@ -74,7 +74,9 @@ namespace flex_next_decoder {
          * Pass this symbol to FlexDataCollector::processSymbol() for protocol processing.
          */
         uint8_t getModalSymbol() const {
-            std::cout << typeid(*this).name() << "getModalSymbol called" << std::endl;
+            if (getVerbosityLevel() >= 5) {
+                std::cout << typeid(*this).name() << "getModalSymbol called" << std::endl;
+            }
             return modal_symbol_;
         }
 

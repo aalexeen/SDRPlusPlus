@@ -35,7 +35,7 @@ namespace flex_next_decoder {
         /**
          * @brief Destructor
          */
-        ~FlexSynchronizer() = default;
+        ~FlexSynchronizer() override = default;
 
         // Copy and move operations
         FlexSynchronizer(const FlexSynchronizer&) = default;
