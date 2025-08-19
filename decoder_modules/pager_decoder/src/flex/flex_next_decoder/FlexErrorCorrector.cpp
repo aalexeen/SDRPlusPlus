@@ -13,21 +13,18 @@ namespace flex_next_decoder {
 
             // BCH parameters for FLEX protocol:
             // m=5 (field order), n=31 (code length), k=21 (data length), t=2 (error capability)
-            bch_code_ = std::make_unique<BCHCode>(
-                polynomial.data(), // Generator polynomial coefficients
-                5,                 // Field order (GF(2^5))
-                31,                // Code length
-                21,                // Data length
-                2                  // Error correction capability
+            bch_code_ = std::make_unique<BCHCode>(polynomial.data(), // Generator polynomial coefficients
+                                                  5, // Field order (GF(2^5))
+                                                  31, // Code length
+                                                  21, // Data length
+                                                  2 // Error correction capability
             );
-        }
-        catch (const std::exception& e) {
+        } catch (const std::exception &e) {
             throw std::runtime_error("Failed to initialize BCH error corrector: " + std::string(e.what()));
         }
     }
 
-    FlexErrorCorrector::FlexErrorCorrector(int verbosity_level)
-        : FlexNextDecoder(verbosity_level) {
+    FlexErrorCorrector::FlexErrorCorrector(int verbosity_level) : FlexNextDecoder(verbosity_level) {
         try {
             // Initialize BCH(31,21,5) code with FLEX-specific parameters
             // Generator polynomial: x^5 + x^2 + 1 = 100101 binary
@@ -35,32 +32,46 @@ namespace flex_next_decoder {
 
             // BCH parameters for FLEX protocol:
             // m=5 (field order), n=31 (code length), k=21 (data length), t=2 (error capability)
-            bch_code_ = std::make_unique<BCHCode>(
-                polynomial.data(), // Generator polynomial coefficients
-                5,                 // Field order (GF(2^5))
-                31,                // Code length
-                21,                // Data length
-                2                  // Error correction capability
+            bch_code_ = std::make_unique<BCHCode>(polynomial.data(), // Generator polynomial coefficients
+                                                  5, // Field order (GF(2^5))
+                                                  31, // Code length
+                                                  21, // Data length
+                                                  2 // Error correction capability
             );
-        }
-        catch (const std::exception& e) {
+        } catch (const std::exception &e) {
             throw std::runtime_error("Failed to initialize BCH error corrector: " + std::string(e.what()));
         }
     }
 
-    bool FlexErrorCorrector::fixErrors(uint32_t& data, char phase_id) {
+    bool FlexErrorCorrector::fixErrors(uint32_t &data, char phase_id) {
         // Convert 32-bit data word to BCH coefficient array format
         // Extract bits from MSB to LSB (bit 30 down to bit 0)
         std::array<int, 31> received;
         uint32_t temp_data = data;
 
+        // Only print debug for non-zero data
+        if (data != 0 && verbosity_level_ >= 3) {
+            std::cout << "DEBUG: Input data=0x" << std::hex << data << std::dec << std::endl;
+        }
+
         for (int i = 0; i < 31; i++) {
             received[i] = (temp_data >> 30) & 1; // Extract MSB
-            temp_data <<= 1;                     // Shift left for next bit
+            temp_data <<= 1; // Shift left for next bit
+        }
+
+        // Only print bit pattern for non-zero data and high verbosity
+        if (data != 0 && verbosity_level_ >= 4) {
+            std::cout << "DEBUG: BCH input bits: ";
+            for (int i = 0; i < 31; i++) { std::cout << received[i]; }
+            std::cout << std::endl;
         }
 
         // Apply BCH error correction
         int decode_result = bch_code_->decode(received.data());
+
+        if (data != 0 && verbosity_level_ >= 3) {
+            std::cout << "DEBUG: BCH decode result=" << decode_result << std::endl;
+        }
 
         if (decode_result == 0) {
             // Success: Convert corrected coefficients back to 32-bit format
@@ -75,29 +86,28 @@ namespace flex_next_decoder {
             uint32_t errors_fixed = countBits(error_mask);
 
             if (errors_fixed > 0) {
-                std::cout << "FLEX_NEXT: Phase " << phase_id
-                          << " Fixed " << errors_fixed
-                          << " errors @ 0x" << std::hex << error_mask
-                          << " (0x" << std::hex << (data & 0x7FFFFFFF)
-                          << " -> 0x" << std::hex << corrected_data << ")"
-                          << std::dec << std::endl;
+                std::cout << "FLEX_NEXT: Phase " << phase_id << " Fixed " << errors_fixed << " errors @ 0x" << std::hex
+                          << error_mask << " (0x" << std::hex << (data & 0x7FFFFFFF) << " -> 0x" << std::hex
+                          << corrected_data << ")" << std::dec << std::endl;
             }
 
             // Write corrected data back to caller
             data = corrected_data;
             return true;
-        }
-        else {
-            // Error correction failed - too much corruption
-            std::cout << "FLEX_NEXT: Phase " << phase_id
-                      << " Data corruption - Unable to fix errors." << std::endl;
+        } else {
+            // Only log failures for non-zero data to reduce spam
+            if (data != 0) {
+                std::cout << "FLEX_NEXT: Phase " << phase_id << " Data corruption - Unable to fix errors (0x"
+                          << std::hex << data << std::dec << ")." << std::endl;
+            }
             return false;
         }
     }
 
-    uint32_t FlexErrorCorrector::countBits(uint32_t data) const { // checked
-                                                                  // Efficient bit counting using Brian Kernighan's algorithm variation
-                                                                  // or compiler builtin if available
+    uint32_t
+    FlexErrorCorrector::countBits(uint32_t data) const { // checked
+                                                         // Efficient bit counting using Brian Kernighan's algorithm
+                                                         // variation or compiler builtin if available
 
 #ifdef USE_BUILTIN_POPCOUNT
         return __builtin_popcount(data);

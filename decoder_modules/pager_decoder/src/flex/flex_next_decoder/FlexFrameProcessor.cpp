@@ -202,20 +202,42 @@ namespace flex_next_decoder {
             return true; // No error corrector available, assume data is clean
         }
 
-        bool success = true;
+        int failed_words = 0;
+        int corrected_words = 0;
+        int clean_words = 0;
 
         for (size_t i = 0; i < phase_data.size(); i++) {
+            uint32_t original_word = phase_data[i];
             bool corrected = error_corrector_->fixErrors(phase_data[i], phase_name);
+
             if (!corrected) {
-                // If we can't correct errors in any word, the whole phase is unreliable
-                success = false;
-                break;
+                failed_words++;
+                // Instead of abandoning, mark as idle and continue
+                phase_data[i] = 0x1FFFFF; // Idle pattern (all 1s in 21-bit field)
+            } else if (phase_data[i] != (original_word & 0x1FFFFF)) {
+                corrected_words++;
+            } else {
+                clean_words++;
             }
 
-            // Extract just the message bits (21 bits)
+            // Always apply the 21-bit mask
             phase_data[i] &= MESSAGE_BITS_MASK;
         }
 
+        if (verbosity_level_ >= 2 && (failed_words > 0 || corrected_words > 0)) {
+            std::cout << "FLEX_NEXT: Phase " << phase_name << " - Clean:" << clean_words
+                      << " Corrected:" << corrected_words << " Failed:" << failed_words
+                      << " Total:" << phase_data.size() << std::endl;
+        }
+
+        // Be much more lenient - allow processing if at least 50% of words are usable
+        // In real FLEX systems, some corruption is normal
+        bool success = (failed_words <= (int) phase_data.size() / 2);
+
+        if (!success && verbosity_level_ >= 1) {
+            std::cout << "FLEX_NEXT: Phase " << phase_name << " abandoned - too many uncorrectable words ("
+                      << failed_words << "/" << phase_data.size() << ")" << std::endl;
+        }
         return success;
     }
 
