@@ -8,8 +8,8 @@
 #include <utils/flog.h>
 #include <memory>
 #include "dsp.h" // Local FLEX DSP header
-// #include "flex_next.h"  // FlexDecoderWrapper
-// #include "flex_next.h"
+#include <thread>
+#include <chrono>
 #include "../BCHCode.h" // BCH error correction (up one directory)
 #include "flex_next_decoder/FlexDecoder.h"
 
@@ -19,27 +19,40 @@ class FLEXDecoderNext : public Decoder {
 public:
     FLEXDecoderNext(const std::string &name, VFOManager::VFO *vfo) : name(name), vfo(vfo), initialized(false) {
         try {
+            // Validate VFO first
+            if (!vfo) { throw std::runtime_error("VFO is null"); }
+
             // Set VFO parameters for FLEX (typically 929-932 MHz, 25kHz bandwidth)
             vfo->setBandwidthLimits(12500, 12500, true);
             vfo->setSampleRate(PAGER_AUDIO_SAMPLERATE, 25000);
 
+            // Wait a moment for VFO to settle
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+            // Initialize DSP chain with validation - use VFO sample rate
+            if (!vfo->output) { throw std::runtime_error("VFO output stream is null"); }
+
             // Initialize DSP chain with validation
             dsp.init(vfo->output, 24000); // Use fixed sample rate
 
-            if (!dsp.isInitialized()) { throw std::runtime_error("Failed to initialize FLEX DSP"); }
-
+            if (!dsp.isInitialized()) {
+                throw std::runtime_error("Failed to initialize FLEX DSP - check sample rates and filters");
+            }
 
             // Initialize FLEX decoder with BCH error correction
             initFLEXDecoder();
 
-            initialized = true;
-            flog::info("FLEX decoder created successfully");
-
             // Audio handler - receives audio samples for FLEX decoding
             audioHandler.init(&dsp.out, _audioHandler, this);
+
+            initialized = true;
+            flog::info("FLEX decoder created successfully");
         } catch (const std::exception &e) {
             flog::error("Failed to create FLEX decoder: {}", e.what());
             initialized = false;
+
+            // Clean up partially initialized components
+            cleanup();
         }
     }
 
@@ -288,6 +301,15 @@ private:
                 flog::info("FLEX decoder reset");
             }
         } catch (const std::exception &e) { flog::error("Error resetting FLEX decoder: {}", e.what()); }
+    }
+
+    void cleanup() {
+        try {
+            audioHandler.stop();
+            if (dsp.isInitialized()) { dsp.stop(); }
+        } catch (...) {
+            // Ignore cleanup errors
+        }
     }
 
     std::string name;
