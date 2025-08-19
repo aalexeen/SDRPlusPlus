@@ -155,12 +155,24 @@ private:
     }
 
     static void _audioHandler(float *data, int count, void *ctx) {
+        static int total_samples = 0;
+        total_samples += count;
+
+        // Log every 22050 samples (1 second worth)
+        if (total_samples % 22050 < count) {
+            flog::info("Audio handler: {} samples this call, {} total", count, total_samples);
+        }
+
         FLEXDecoderNext *_this = (FLEXDecoderNext *) ctx;
         if (_this && _this->initialized) { _this->processAudioSamples(data, count); }
     }
 
     void processAudioSamples(float *samples, int count) {
-        if (!initialized || !samples || count <= 0) { return; }
+        if (!initialized || !samples || count <= 0) {
+            flog::info("processAudioSamples: Invalid call - init={}, samples={}, count={}", initialized,
+                       static_cast<const void *>(samples), count);
+            return;
+        }
 
         // Log sample reception periodically for debugging
         static int sample_counter = 0;
