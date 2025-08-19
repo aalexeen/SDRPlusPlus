@@ -1,3 +1,4 @@
+
 #pragma once
 #include <dsp/stream.h>
 #include <dsp/demod/quadrature.h>
@@ -23,17 +24,18 @@ public:
             fmDemod.init(nullptr, 4500.0, samplerate);
 
             // AGC for signal amplitude normalization
-            // ONLY CHANGE: Slightly faster AGC response
-            agc.init(nullptr, 1.0, 10.0, 2e-3, 1.0); // Changed rate from 1e-3 to 2e-3
+            // Reverted to original slower AGC response for better stability
+            agc.init(nullptr, 1.0, 10.0, 1e-3, 1.0); // Reverted from 2e-3 back to 1e-3
 
-            // Low-pass filter - ONLY CHANGE: Slightly wider bandwidth
-            lpTaps = dsp::taps::lowPass(6500.0, 8000.0, samplerate); // Changed from 5000/6000
+            // Low-pass filter - Reverted to narrower bandwidth for cleaner signal
+            // FLEX max symbol rate is 3200 baud, so use 5000 Hz cutoff with good roll-off
+            lpTaps = dsp::taps::lowPass(5000.0, 6000.0, samplerate); // Reverted from 6500/8000
             lpFilter.init(nullptr, lpTaps);
 
             // Initialize the base class
             base_type::init(in);
             initialized = true;
-            flog::info("FLEX DSP initialized: FM demod (±4500 Hz) + AGC + LP filter (6.5kHz) at {} Hz", samplerate);
+            flog::info("FLEX DSP initialized: FM demod (±4500 Hz) + AGC + LP filter (5kHz) at {} Hz", samplerate);
         } catch (const std::exception &e) {
             flog::error("FLEX DSP initialization failed: {}", e.what());
             initialized = false;
@@ -56,14 +58,24 @@ public:
             }
 
             // FM demodulation
+            if (!fmDemod.out.readBuf) {
+                flog::error("FLEX DSP: FM demod output buffer is null");
+                return -1;
+            }
+
             count = fmDemod.process(count, base_type::_in->readBuf, fmDemod.out.readBuf);
             if (count <= 0) { return count; }
 
             // Simple DC removal using a high-pass filter approach
-            // Keep original implementation but make it per-instance
+            // This mimics the original multimon-ng DC offset removal
             const float dcAlpha = 16.0f / _samplerate; // Equivalent to 16 Hz cutoff
 
             // AGC processing with DC removal
+            if (!agc.out.readBuf) {
+                flog::error("FLEX DSP: AGC output buffer is null");
+                return -1;
+            }
+
             // First pass: DC removal
             for (int i = 0; i < count; i++) {
                 float sample = fmDemod.out.readBuf[i];
@@ -81,12 +93,18 @@ public:
             if (count <= 0) { return count; }
 
             // Low-pass filtering to remove high-frequency noise
+            if (!lpFilter.out.readBuf) {
+                flog::error("FLEX DSP: LP filter output buffer is null");
+                return -1;
+            }
+
             count = lpFilter.process(count, agc.out.readBuf, lpFilter.out.readBuf);
             if (count <= 0) { return count; }
 
-            // Copy to output - ONLY CHANGE: Less aggressive scaling
+            // Copy to output with appropriate scaling for FLEX decoder
+            // Reverted to more conservative scaling from the old version
             for (int i = 0; i < count; i++) {
-                base_type::out.writeBuf[i] = lpFilter.out.readBuf[i] * 0.3f; // Changed from 0.1f
+                base_type::out.writeBuf[i] = lpFilter.out.readBuf[i] * 0.1f; // Reverted from 0.3f
             }
 
             // Flush input and swap output
@@ -113,5 +131,5 @@ private:
     dsp::filter::FIR<float, float> lpFilter;
     double _samplerate;
     bool initialized;
-    float dcAccumulator = 0.0f; // Made it per-instance instead of static
+    float dcAccumulator = 0.0f; // Per-instance DC accumulator
 };

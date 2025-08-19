@@ -62,6 +62,20 @@ public:
         // New: Message window toggle
         ImGui::Checkbox("Show Message Window", &showMessageWindow);
 
+        // Verbosity level control
+        ImGui::Text("Debug Settings:");
+        if (ImGui::SliderInt("Verbosity Level", &verbosity_level_, 0, 6, "Level %d")) {
+            // Update the FlexDecoder verbosity level when changed
+            if (flexDecoderNext) {
+                flexDecoderNext->setVerbosityLevel(verbosity_level_);
+                flog::info("FLEX decoder verbosity level set to {}", verbosity_level_);
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Debug output level:\n0 = Silent\n1 = Errors only\n2 = Info + Errors\n3 = Debug info\n4 "
+                              "= Verbose debug\n5 = Very verbose");
+        }
+
         if (ImGui::Button("Reset Decoder")) { resetDecoder(); }
         // Message window display
         if (showMessageWindow) { showFlexMessageWindow(); }
