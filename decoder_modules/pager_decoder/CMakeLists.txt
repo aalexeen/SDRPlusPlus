@@ -41,11 +41,6 @@ else ()
     message(STATUS "Pager Decoder: Using BCH stub (no error correction)")
 endif ()
 
-# Check if FlexOutputFormatter.cpp exists (it might be header-only)
-if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/flex/flex_next_decoder/FlexOutputFormatter.cpp")
-    list(APPEND SRC "src/flex/flex_next_decoder/FlexOutputFormatter.cpp")
-endif ()
-
 # Create the module using the standard SDR++ module system
 include(${SDRPP_MODULE_CMAKE})
 

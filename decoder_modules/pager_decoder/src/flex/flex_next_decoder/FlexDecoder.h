@@ -69,10 +69,10 @@ namespace flex_next_decoder {
         ~FlexDecoder() override;
 
         // Non-copyable but moveable (manages unique decoder state)
-        FlexDecoder(const FlexDecoder&) = delete;
-        FlexDecoder& operator=(const FlexDecoder&) = delete;
-        FlexDecoder(FlexDecoder&&) = default;
-        FlexDecoder& operator=(FlexDecoder&&) = default;
+        FlexDecoder(const FlexDecoder &) = delete;
+        FlexDecoder &operator=(const FlexDecoder &) = delete;
+        FlexDecoder(FlexDecoder &&) = default;
+        FlexDecoder &operator=(FlexDecoder &&) = default;
 
         //=========================================================================
         // Main Interface (equivalent to original C functions)
@@ -95,7 +95,7 @@ namespace flex_next_decoder {
          * 6. FlexMessageDecoder: Message parsing and group handling
          * 7. FlexOutputFormatter: Final output formatting
          */
-        void processSamples(const float* samples, size_t count);
+        void processSamples(const float *samples, size_t count);
 
         /**
          * @brief Process single audio sample (for compatibility)
@@ -190,7 +190,7 @@ namespace flex_next_decoder {
          * @param sym_rectified
          * @param sync_info
          */
-        void handleFIWState(uint8_t symbol, u_char sym_rectified, SyncInfo& sync_info);
+        void handleFIWState(uint8_t symbol, u_char sym_rectified, SyncInfo &sync_info);
 
         /**
          * @brief Handle SYNC2 state - second sync header
@@ -219,19 +219,19 @@ namespace flex_next_decoder {
         //=========================================================================
 
         // Core signal processing
-        std::unique_ptr<FlexDemodulator> demodulator_;    ///< Signal processing and symbol recovery
+        std::unique_ptr<FlexDemodulator> demodulator_; ///< Signal processing and symbol recovery
         std::unique_ptr<FlexStateMachine> state_machine_; ///< Protocol state management
-        std::unique_ptr<FlexSynchronizer> synchronizer_;  ///< Sync pattern detection
+        std::unique_ptr<FlexSynchronizer> synchronizer_; ///< Sync pattern detection
 
         // Frame and data processing
         std::unique_ptr<FlexFrameProcessor> frame_processor_; ///< Frame processing and BCH correction
-        std::unique_ptr<FlexDataCollector> data_collector_;   ///< Phase data collection and interleaving
+        std::unique_ptr<FlexDataCollector> data_collector_; ///< Phase data collection and interleaving
         std::shared_ptr<FlexErrorCorrector> error_corrector_; ///< BCH error correction
 
         // Message processing
-        std::shared_ptr<FlexMessageDecoder> message_decoder_;   ///< Message parsing (Strategy pattern)
-        std::shared_ptr<FlexGroupHandler> group_handler_;       ///< Group messaging support
-        std::unique_ptr<FlexOutputFormatter> output_formatter_; ///< Final output formatting
+        std::shared_ptr<FlexMessageDecoder> message_decoder_; ///< Message parsing (Strategy pattern)
+        std::shared_ptr<FlexGroupHandler> group_handler_; ///< Group messaging support
+        std::shared_ptr<FlexOutputFormatter> output_formatter_; ///< Final output formatting
 
         //=========================================================================
         // State Variables
@@ -240,17 +240,17 @@ namespace flex_next_decoder {
         uint32_t sample_frequency_; ///< Input sample rate
 
         // Frame processing state
-        uint32_t fiw_count_;    ///< FIW bit counter
+        uint32_t fiw_count_; ///< FIW bit counter
         uint32_t fiw_raw_data_; ///< Accumulated FIW data
-        uint32_t sync2_count_;  ///< SYNC2 symbol counter
-        uint32_t data_count_;   ///< DATA symbol counter
+        uint32_t sync2_count_; ///< SYNC2 symbol counter
+        uint32_t data_count_; ///< DATA symbol counter
 
         SyncInfo sync_info_; ///< Sync pattern info
 
         // Timing parameters (from original C constants)
-        static constexpr uint32_t FIW_DOTTING_BITS = 16;   ///< FIW preamble bits
-        static constexpr uint32_t FIW_TOTAL_BITS = 48;     ///< Total FIW bits
-        static constexpr uint32_t SYNC2_DURATION_MS = 25;  ///< SYNC2 duration
+        static constexpr uint32_t FIW_DOTTING_BITS = 16; ///< FIW preamble bits
+        static constexpr uint32_t FIW_TOTAL_BITS = 48; ///< Total FIW bits
+        static constexpr uint32_t SYNC2_DURATION_MS = 25; ///< SYNC2 duration
         static constexpr uint32_t DATA_DURATION_MS = 1760; ///< DATA duration
     };
 

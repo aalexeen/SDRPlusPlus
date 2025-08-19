@@ -33,10 +33,8 @@ namespace flex_next_decoder {
     constexpr int64_t GROUP_CAPCODE_MAX = 2029583;
     constexpr int64_t MAX_CAPCODE = 4297068542LL;
 
-    constexpr std::array<char, 17> FLEX_BCD = {
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        ' ', 'U', ' ', '-', ']', '[', '\0'
-    };
+    constexpr std::array<char, 17> FLEX_BCD = { '0', '1', '2', '3', '4', '5', '6', '7', '8',
+                                                '9', ' ', 'U', ' ', '-', ']', '[', '\0' };
 
     struct FlexMode {
         uint32_t sync_code;
@@ -45,19 +43,14 @@ namespace flex_next_decoder {
     };
 
     constexpr std::array<FlexMode, 5> FLEX_MODES = { {
-        { 0x870C, 1600, 2 }, // 1600 bps, 2-level FSK
-        { 0xB068, 1600, 4 }, // 1600 bps, 4-level FSK
-        { 0x7B18, 3200, 2 }, // 3200 bps, 2-level FSK
-        { 0xDEA0, 3200, 4 }, // 3200 bps, 4-level FSK
-        { 0x4C7C, 3200, 4 }  // 3200 bps, 4-level FSK (alternate)
+            { 0x870C, 1600, 2 }, // 1600 bps, 2-level FSK
+            { 0xB068, 1600, 4 }, // 1600 bps, 4-level FSK
+            { 0x7B18, 3200, 2 }, // 3200 bps, 2-level FSK
+            { 0xDEA0, 3200, 4 }, // 3200 bps, 4-level FSK
+            { 0x4C7C, 3200, 4 } // 3200 bps, 4-level FSK (alternate)
     } };
 
-    enum class FlexState : uint8_t {
-        Sync1,
-        FIW,
-        Sync2,
-        Data
-    };
+    enum class FlexState : uint8_t { Sync1, FIW, Sync2, Data };
 
     enum class MessageType : uint8_t {
         Secure = 0,
@@ -116,25 +109,19 @@ namespace flex_next_decoder {
          * @brief Get read-only access to buffer data
          * @return Pointer to buffer data
          */
-        const uint32_t* data() const {
-            return buffer.data();
-        }
+        const uint32_t *data() const { return buffer.data(); }
 
         /**
          * @brief Get mutable access to buffer data (for internal use)
          * @return Pointer to buffer data
          */
-        uint32_t* data() {
-            return buffer.data();
-        }
+        uint32_t *data() { return buffer.data(); }
 
         /**
          * @brief Get buffer size
          * @return Number of words in buffer
          */
-        constexpr size_t size() const {
-            return PHASE_WORDS;
-        }
+        constexpr size_t size() const { return PHASE_WORDS; }
     };
 
     struct PhaseData {
@@ -165,8 +152,8 @@ namespace flex_next_decoder {
 
     enum class FragmentFlag : char {
         Unknown = '?',
-        Complete = 'K',    // OK to display
-        Fragment = 'F',    // Needs continuation
+        Complete = 'K', // OK to display
+        Fragment = 'F', // Needs continuation
         Continuation = 'C' // Completes fragments
     };
 
@@ -197,6 +184,9 @@ namespace flex_next_decoder {
         MessageType type = MessageType::Tone;
         bool long_address = false;
         int64_t capcode = 0;
+        bool is_group_message = false; // Group message flag
+        uint32_t fragment_number = 0; // Fragment number (0-3)
+        bool continuation_flag = false; // Continuation flag
     };
 
 } // namespace flex_next_decoder

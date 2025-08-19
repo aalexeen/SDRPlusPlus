@@ -39,16 +39,16 @@ namespace flex_next_decoder {
             group_handler_ = std::make_shared<FlexGroupHandler>();
             std::cout << "FLEX_NEXT: GroupHandler initialized" << std::endl;
 
-            message_decoder_ = std::make_shared<FlexMessageDecoder>(group_handler_);
+            // Output formatting
+            output_formatter_ = std::make_shared<FlexOutputFormatter>();
+            std::cout << "FLEX_NEXT: OutputFormatter initialized" << std::endl;
+
+            message_decoder_ = std::make_shared<FlexMessageDecoder>(group_handler_, output_formatter_);
             std::cout << "FLEX_NEXT: MessageDecoder initialized" << std::endl;
 
             // Frame processing (depends on error corrector and message decoder)
             frame_processor_ = std::make_unique<FlexFrameProcessor>(error_corrector_, message_decoder_, group_handler_);
             std::cout << "FLEX_NEXT: FrameProcessor initialized" << std::endl;
-
-            // Output formatting
-            output_formatter_ = std::make_unique<FlexOutputFormatter>();
-            std::cout << "FLEX_NEXT: OutputFormatter initialized" << std::endl;
 
             if (getVerbosityLevel() >= 2) {
                 std::cout << "FLEX_NEXT: Decoder initialized (sample_freq=" << sample_frequency << ")" << std::endl;
@@ -87,17 +87,17 @@ namespace flex_next_decoder {
             group_handler_ = std::make_shared<FlexGroupHandler>(verbosity_level);
             std::cout << "FLEX_NEXT: GroupHandler initialized" << std::endl;
 
-            message_decoder_ = std::make_shared<FlexMessageDecoder>(group_handler_, verbosity_level);
+            // Output formatting
+            output_formatter_ = std::make_shared<FlexOutputFormatter>(verbosity_level);
+            std::cout << "FLEX_NEXT: OutputFormatter initialized" << std::endl;
+
+            message_decoder_ = std::make_shared<FlexMessageDecoder>(group_handler_,output_formatter_, verbosity_level);
             std::cout << "FLEX_NEXT: MessageDecoder initialized" << std::endl;
 
             // Frame processing (depends on error corrector and message decoder)
             frame_processor_ = std::make_unique<FlexFrameProcessor>(error_corrector_, message_decoder_, group_handler_,
                                                                     verbosity_level);
             std::cout << "FLEX_NEXT: FrameProcessor initialized" << std::endl;
-
-            // Output formatting
-            output_formatter_ = std::make_unique<FlexOutputFormatter>();
-            std::cout << "FLEX_NEXT: OutputFormatter initialized" << std::endl;
 
             if (getVerbosityLevel() >= 2) {
                 std::cout << "FLEX_NEXT: Decoder initialized (sample_freq=" << sample_frequency << ")" << std::endl;
