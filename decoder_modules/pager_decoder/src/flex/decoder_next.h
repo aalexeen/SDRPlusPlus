@@ -12,6 +12,7 @@
 #include <chrono>
 #include "../BCHCode.h" // BCH error correction (up one directory)
 #include "flex_next_decoder/FlexDecoder.h"
+#include "flex_next_decoder/parsers/IMessageParser.h"
 
 #include <iostream>
 
@@ -276,9 +277,34 @@ private:
         }
     }
 
+    void handleFlexMessage(const flex_next_decoder::MessageParseResult &result,
+                           const flex_next_decoder::MessageParseInput &input) {
+        try {
+            // Log the message for debugging
+            if (verbosity_level_ >= 2) {
+                flog::info("FLEX Message received - Type: {}, Content: {}", static_cast<int>(input.type),
+                           result.content);
+            }
+
+            // Check if we have a valid message decoder
+            if (!flexMessageDecoder) {
+                flog::error("FlexMessageDecoder not initialized, cannot process message");
+                return;
+            }
+
+            // Call the output formatter through the message decoder
+            flexMessageDecoder->outputFormattedMessage(result, input);
+
+            // Also call the existing handleFlexMessage for compatibility
+            if (!result.content.empty()) {
+                handleFlexMessage(input.capcode, static_cast<int>(input.type), result.content);
+            }
+        } catch (const std::exception &e) { flog::error("Error handling FLEX message: {}", e.what()); }
+    }
+
     void handleFlexMessage(int64_t address, int type, const std::string &data) {
         try {
-            // Safe message handling
+            // Safe message handling (existing function)
             if (data.length() > 1000) {
                 flog::warn("FLEX message too long, truncating");
                 return;
@@ -291,6 +317,7 @@ private:
             flog::info("FLEX Message - Addr: {}, Type: {}, Data: {}", address, type, data);
         } catch (const std::exception &e) { flog::error("Error handling FLEX message: {}", e.what()); }
     }
+
 
     void resetDecoder() {
         if (!initialized) return;
