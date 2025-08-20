@@ -9,7 +9,7 @@ namespace flex_next_decoder {
     //=============================================================================
 
     FlexMessageDecoder::FlexMessageDecoder(std::shared_ptr<FlexGroupHandler> group_handler,
-                                           std::shared_ptr<FlexOutputFormatter> output_formatter) :
+                                           std::unique_ptr<FlexOutputFormatter> output_formatter) :
         group_handler_(std::move(group_handler)), output_formatter_(std::move(output_formatter)) {
         initializeParsers();
 
@@ -22,7 +22,7 @@ namespace flex_next_decoder {
     }
 
     FlexMessageDecoder::FlexMessageDecoder(std::shared_ptr<FlexGroupHandler> group_handler,
-                                           std::shared_ptr<FlexOutputFormatter> output_formatter, int verbosity_level) :
+                                           std::unique_ptr<FlexOutputFormatter> output_formatter, int verbosity_level) :
         FlexNextDecoder(verbosity_level), output_formatter_(std::move(output_formatter)),
         group_handler_(std::move(group_handler)) {
         initializeParsers();

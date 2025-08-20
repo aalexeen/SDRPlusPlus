@@ -6,6 +6,7 @@
 #include <sstream>
 
 namespace flex_next_decoder {
+    FlexOutputFormatter::FlexOutputFormatter(): FlexNextDecoder(2){}
 
     FlexOutputFormatter::FlexOutputFormatter(int verbosity_level) : FlexNextDecoder(verbosity_level) {}
 
@@ -62,12 +63,8 @@ namespace flex_next_decoder {
         std::cout << std::endl;
 
         // Optional debug output at higher verbosity levels
-        if (getVerbosityLevel() >= 3 && message.success) {
-            std::cout << "DEBUG: Message parsed successfully by " << message.parser_name << " parser" << std::endl;
-        }
-
-        if (!message.error_message.empty() && getVerbosityLevel() >= 2) {
-            std::cout << "WARNING: " << message.error_message << std::endl;
+        if (getVerbosityLevel() >= 3 && !message.content.empty()) {
+            std::cout << "DEBUG: Message parsed successfully" << std::endl;
         }
     }
 

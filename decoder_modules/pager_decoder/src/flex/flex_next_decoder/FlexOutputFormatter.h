@@ -11,9 +11,9 @@ namespace flex_next_decoder {
 
     class FlexOutputFormatter : public FlexNextDecoder {
     public:
-        FlexOutputFormatter() = default;
+        FlexOutputFormatter();
         FlexOutputFormatter(int verbosity_level);
-        ~FlexOutputFormatter() = default;
+        ~FlexOutputFormatter() override = default;
 
         void outputMessage(const ParsedMessage& message,
                            const MessageInfo& msg_info,

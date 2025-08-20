@@ -130,10 +130,10 @@ namespace flex_next_decoder {
          * @param output_formatter
          */
         FlexMessageDecoder(std::shared_ptr<FlexGroupHandler> group_handler,
-                           std::shared_ptr<FlexOutputFormatter> output_formatter);
+                           std::unique_ptr<FlexOutputFormatter> output_formatter);
 
         FlexMessageDecoder(std::shared_ptr<FlexGroupHandler> group_handler,
-                           std::shared_ptr<FlexOutputFormatter> output_formatter, int verbosity_level);
+                           std::unique_ptr<FlexOutputFormatter> output_formatter, int verbosity_level);
 
         /**
          * @brief Destructor - automatic cleanup via RAII
@@ -346,7 +346,7 @@ namespace flex_next_decoder {
 
         // Enhanced functionality
         std::shared_ptr<FlexGroupHandler> group_handler_;
-        std::shared_ptr<FlexOutputFormatter> output_formatter_;
+        std::unique_ptr<FlexOutputFormatter> output_formatter_;
         DecodingOptions options_;
         MessageStatistics statistics_;
 

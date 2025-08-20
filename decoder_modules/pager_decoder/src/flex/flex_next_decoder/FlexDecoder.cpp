@@ -40,10 +40,10 @@ namespace flex_next_decoder {
             std::cout << "FLEX_NEXT: GroupHandler initialized" << std::endl;
 
             // Output formatting
-            output_formatter_ = std::make_shared<FlexOutputFormatter>();
+            output_formatter_ = std::make_unique<FlexOutputFormatter>();
             std::cout << "FLEX_NEXT: OutputFormatter initialized" << std::endl;
 
-            message_decoder_ = std::make_shared<FlexMessageDecoder>(group_handler_, output_formatter_);
+            message_decoder_ = std::make_shared<FlexMessageDecoder>(group_handler_, std::move(output_formatter_));
             std::cout << "FLEX_NEXT: MessageDecoder initialized" << std::endl;
 
             // Frame processing (depends on error corrector and message decoder)
@@ -88,10 +88,10 @@ namespace flex_next_decoder {
             std::cout << "FLEX_NEXT: GroupHandler initialized" << std::endl;
 
             // Output formatting
-            output_formatter_ = std::make_shared<FlexOutputFormatter>(verbosity_level);
+            output_formatter_ = std::make_unique<FlexOutputFormatter>(verbosity_level);
             std::cout << "FLEX_NEXT: OutputFormatter initialized" << std::endl;
 
-            message_decoder_ = std::make_shared<FlexMessageDecoder>(group_handler_,output_formatter_, verbosity_level);
+            message_decoder_ = std::make_shared<FlexMessageDecoder>(group_handler_,std::move(output_formatter_), verbosity_level);
             std::cout << "FLEX_NEXT: MessageDecoder initialized" << std::endl;
 
             // Frame processing (depends on error corrector and message decoder)

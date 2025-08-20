@@ -231,7 +231,7 @@ namespace flex_next_decoder {
         // Message processing
         std::shared_ptr<FlexMessageDecoder> message_decoder_; ///< Message parsing (Strategy pattern)
         std::shared_ptr<FlexGroupHandler> group_handler_; ///< Group messaging support
-        std::shared_ptr<FlexOutputFormatter> output_formatter_; ///< Final output formatting
+        std::unique_ptr<FlexOutputFormatter> output_formatter_; ///< Final output formatting
 
         //=========================================================================
         // State Variables

@@ -23,6 +23,7 @@ set(SRC
         "src/flex/flex_next_decoder/FlexErrorCorrector.cpp"
         "src/flex/flex_next_decoder/FlexMessageDecoder.cpp"
         "src/flex/flex_next_decoder/FlexGroupHandler.cpp"
+        "src/flex/flex_next_decoder/FlexOutputFormatter.cpp"
 
         # Message parser implementations
         "src/flex/flex_next_decoder/parsers/IMessageParser.cpp"
