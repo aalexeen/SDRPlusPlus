@@ -413,6 +413,12 @@ namespace flex_next_decoder {
         input.group_bit = address_info.group_bit;
         input.cycle_number = cycle_number;
         input.frame_number = frame_number;
+        // Add sync and frame information needed for output formatting
+        input.baud_rate = 1600; // just for temp. need to be getting properly
+        input.levels = sync_info_.levels; // Store sync info in frame processor
+        input.polarity = sync_info_.polarity;
+        input.sync_code = sync_info_.sync_code;
+
 
         // Parse the message - FlexMessageDecoder now handles group processing internally
         MessageParseResult result = message_decoder_->parseMessage(input);
@@ -442,5 +448,11 @@ namespace flex_next_decoder {
     }
 
     bool FlexFrameProcessor::isValidCapcode(int64_t capcode) { return capcode >= 0 && capcode <= MAX_CAPCODE; }
+
+    void FlexFrameProcessor::updateSyncInfo(const SyncInfo &sync_info, uint32_t fiw_raw) {
+        sync_info_ = sync_info;
+        current_fiw_raw_ = fiw_raw;
+    }
+
 
 } // namespace flex_next_decoder

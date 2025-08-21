@@ -91,7 +91,8 @@ namespace flex_next_decoder {
             output_formatter_ = std::make_unique<FlexOutputFormatter>(verbosity_level);
             std::cout << "FLEX_NEXT: OutputFormatter initialized" << std::endl;
 
-            message_decoder_ = std::make_shared<FlexMessageDecoder>(group_handler_,std::move(output_formatter_), verbosity_level);
+            message_decoder_ =
+                    std::make_shared<FlexMessageDecoder>(group_handler_, std::move(output_formatter_), verbosity_level);
             std::cout << "FLEX_NEXT: MessageDecoder initialized" << std::endl;
 
             // Frame processing (depends on error corrector and message decoder)
@@ -240,6 +241,9 @@ namespace flex_next_decoder {
                                   << std::endl;
                     }
 
+                    // Update frame processor with sync and FIW information
+                    if (frame_processor_) { frame_processor_->updateSyncInfo(sync_info_, corrected_fiw); }
+
                     // Check for missed group messages
                     std::vector<int> missed_groups = group_handler_->checkAndCleanupMissedGroups(cycle_no, frame_no);
                     for (int group_bit: missed_groups) {
@@ -318,8 +322,8 @@ namespace flex_next_decoder {
 
     void FlexDecoder::processCompletedFrame() { // checked
         // Process completed frame data through frame processor
-        uint32_t baud_rate = demodulator_->getBaudRate(); // original code uses Sync struncture
-        uint32_t fsk_levels = data_collector_->getStatus().fsk_levels; // original code uses Sync struncture
+        uint32_t baud_rate = demodulator_->getBaudRate(); // original code uses Sync structure
+        uint32_t fsk_levels = data_collector_->getStatus().fsk_levels; // original code uses Sync structure
 
         // Extract cycle and frame numbers from last FIW
         uint32_t cycle_no = (fiw_raw_data_ >> 4) & 0xF;

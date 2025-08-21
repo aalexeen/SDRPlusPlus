@@ -216,6 +216,14 @@ namespace flex_next_decoder {
          */
         void setErrorCorrectionEnabled(bool enabled);
 
+        /**
+         * @brief Update sync information for output formatting
+         * @param sync_info Current sync information
+         * @param fiw_raw Raw Frame Information Word
+         */
+        void updateSyncInfo(const SyncInfo &sync_info, uint32_t fiw_raw);
+
+
     private:
         //=========================================================================
         // Phase Processing Methods
@@ -308,6 +316,10 @@ namespace flex_next_decoder {
 
         std::function<void(const ProcessedMessage &)> message_callback_;
         bool error_correction_enabled_ = true;
+
+        // Add sync information storage
+        SyncInfo sync_info_;
+        uint32_t current_fiw_raw_ = 0; // Store raw FIW for frame info extraction
 
         //=========================================================================
         // Constants
