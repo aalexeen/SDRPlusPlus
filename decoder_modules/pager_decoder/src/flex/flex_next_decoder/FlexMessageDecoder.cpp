@@ -84,6 +84,8 @@ namespace flex_next_decoder {
             if (options.error_callback) { options.error_callback(result.error_message); }
         }
 
+        outputFormattedMessage(result, input);
+
         return result;
     }
 

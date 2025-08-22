@@ -12,7 +12,7 @@
 #include <chrono>
 #include "../BCHCode.h" // BCH error correction (up one directory)
 #include "flex_next_decoder/FlexDecoder.h"
-#include "flex_next_decoder/parsers/IMessageParser.h"
+// #include "flex_next_decoder/parsers/IMessageParser.h"
 
 #include <iostream>
 
@@ -277,7 +277,7 @@ private:
         }
     }
 
-    void handleFlexMessage(const flex_next_decoder::MessageParseResult &result,
+    /*void handleFlexMessage(const flex_next_decoder::MessageParseResult &result,
                            const flex_next_decoder::MessageParseInput &input) {
         try {
             // Log the message for debugging
@@ -301,6 +301,7 @@ private:
             }
         } catch (const std::exception &e) { flog::error("Error handling FLEX message: {}", e.what()); }
     }
+    */
 
     void handleFlexMessage(int64_t address, int type, const std::string &data) {
         try {
