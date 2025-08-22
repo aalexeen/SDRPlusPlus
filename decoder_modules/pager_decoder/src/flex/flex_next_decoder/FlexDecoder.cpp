@@ -125,8 +125,13 @@ namespace flex_next_decoder {
         if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "processSingleSample called" << std::endl;
         }
+
+        // The baud rate of first syncword and FIW is always 1600, so set that
+        // rate to start.
+        demodulator_->setBaudRate(1600);
+
         // Step 1: Signal processing and symbol recovery
-        if (demodulator_->processSample(static_cast<double>(sample))) {
+        if (demodulator_->buildSymbol(sample)) {
             // Symbol period complete - get the detected symbol
             uint8_t symbol = demodulator_->getModalSymbol();
 

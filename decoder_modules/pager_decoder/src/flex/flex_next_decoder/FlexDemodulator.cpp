@@ -3,39 +3,33 @@
 #include <iostream>
 
 namespace flex_next_decoder {
-    FlexDemodulator::FlexDemodulator(FlexStateMachine *flex_state_machine, uint32_t sample_frequency)
-        : state_machine_(flex_state_machine),
-          sample_frequency_(sample_frequency),
-          current_baud_(1600), // Always start at 1600 bps (original: flex->Demodulator.baud = 1600)
-          last_sample_(0.0), locked_(false), phase_(0),
-          sample_count_(0), symbol_count_(0), zero_offset_(0.0),
-          envelope_(0.0), envelope_sum_(0.0), envelope_count_(0),
-          symbol_rate_(0.0), modal_symbol_(0), lock_buffer_(0),
-          timeout_counter_(0), non_consecutive_counter_(0) {
+    FlexDemodulator::FlexDemodulator(FlexStateMachine *flex_state_machine, uint32_t sample_frequency) :
+        state_machine_(flex_state_machine), sample_frequency_(sample_frequency),
+        current_baud_(1600), // Always start at 1600 bps (original: flex->Demodulator.baud = 1600)
+        last_sample_(0.0), locked_(false), phase_(0), sample_count_(0), symbol_count_(0), zero_offset_(0.0),
+        envelope_(0.0), envelope_sum_(0.0), envelope_count_(0), symbol_rate_(0.0), modal_symbol_(0), lock_buffer_(0),
+        timeout_counter_(0), non_consecutive_counter_(0) {
         symbol_counts_.fill(0);
     }
 
     FlexDemodulator::FlexDemodulator(FlexStateMachine *flex_state_machine, uint32_t sample_frequency,
-                                     int verbosity_level)
-        : FlexNextDecoder(verbosity_level), // Initialize base class with specified verbosity level
-          state_machine_(flex_state_machine),
-          sample_frequency_(sample_frequency),
-          current_baud_(1600), // Always start at 1600 bps (original: flex->Demodulator.baud = 1600)
-          last_sample_(0.0), locked_(false), phase_(0),
-          sample_count_(0), symbol_count_(0), zero_offset_(0.0),
-          envelope_(0.0), envelope_sum_(0.0), envelope_count_(0),
-          symbol_rate_(0.0), modal_symbol_(0), lock_buffer_(0),
-          timeout_counter_(0), non_consecutive_counter_(0) {
+                                     int verbosity_level) :
+        FlexNextDecoder(verbosity_level), // Initialize base class with specified verbosity level
+        state_machine_(flex_state_machine), sample_frequency_(sample_frequency),
+        current_baud_(1600), // Always start at 1600 bps (original: flex->Demodulator.baud = 1600)
+        last_sample_(0.0), locked_(false), phase_(0), sample_count_(0), symbol_count_(0), zero_offset_(0.0),
+        envelope_(0.0), envelope_sum_(0.0), envelope_count_(0), symbol_rate_(0.0), modal_symbol_(0), lock_buffer_(0),
+        timeout_counter_(0), non_consecutive_counter_(0) {
         symbol_counts_.fill(0);
     }
 
-    bool FlexDemodulator::processSample(double sample) {
+    /*bool FlexDemodulator::processSample(double sample) {
         // Direct equivalent of original buildSymbol() call from Flex_Demodulate()
         if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "processSample called" << std::endl;
         }
         return buildSymbol(sample);
-    }
+    }*/
 
     void FlexDemodulator::resetCounters() {
         // Equivalent to original C code when lock is acquired:
@@ -48,7 +42,7 @@ namespace flex_next_decoder {
         sample_count_ = 0;
     }
 
-    bool FlexDemodulator::buildSymbol(double sample) {
+    bool FlexDemodulator::buildSymbol(float sample) {
         // Direct port of buildSymbol() function from demod_flex_next.c
         if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "buildSymbol called" << std::endl;
@@ -61,17 +55,13 @@ namespace flex_next_decoder {
         // Update the sample counter
         sample_count_++;
 
-        // Remove DC offset (IIR filter) - always active in original code
-        updateDCOffset(sample);
+        // Remove DC offset (IIR filter)
+        if (state_machine_->getCurrentState() == FlexState::Sync1) { updateDCOffset(sample); }
         sample -= zero_offset_;
 
         if (locked_) {
             // During synchronization, establish signal envelope
-            // Note: In original C, this was only during FLEX_STATE_SYNC1
-            // but for integration simplicity, we do it when locked
-            if (state_machine_->getCurrentState() == FlexState::Sync1) {
-                updateEnvelope(sample);
-            }
+            if (state_machine_->getCurrentState() == FlexState::Sync1) { updateEnvelope(sample); }
         } else {
             // Reset and hold in initial state (from original C code)
             envelope_ = 0.0;
@@ -84,14 +74,10 @@ namespace flex_next_decoder {
             if (getVerbosityLevel() >= 5) {
                 std::cout << typeid(*this).name() << ": " << "resetCounters called" << std::endl;
             }
-            // Note: Original C code also set flex->State.Current = FLEX_STATE_SYNC1
-            // but that's now handled by FlexStateMachine in your architecture
         }
 
         // Count symbol levels during MID 80% SYMBOL PERIOD
-        if (phase_percent > 10.0 && phase_percent < 90.0) {
-            countSymbolLevels(sample, phase_percent);
-        }
+        if (phase_percent > 10.0 && phase_percent < 90.0) { countSymbolLevels(sample, phase_percent); }
 
         // Handle ZERO CROSSINGS for PLL
         processZeroCrossing(sample, phase_percent, phase_max);
@@ -112,9 +98,10 @@ namespace flex_next_decoder {
         return false; // Still building symbol
     }
 
-    void FlexDemodulator::updateDCOffset(double sample) {
+    void FlexDemodulator::updateDCOffset(float sample) { // checked
         // Direct port from original C code:
-        // flex->Modulation.zero = (flex->Modulation.zero*(FREQ_SAMP*DC_OFFSET_FILTER) + sample) / ((FREQ_SAMP*DC_OFFSET_FILTER) + 1);
+        // flex->Modulation.zero = (flex->Modulation.zero*(FREQ_SAMP*DC_OFFSET_FILTER) + sample) /
+        // ((FREQ_SAMP*DC_OFFSET_FILTER) + 1);
         if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "updateDCOffset called" << std::endl;
         }
@@ -122,7 +109,7 @@ namespace flex_next_decoder {
         zero_offset_ = (zero_offset_ * filter_term + sample) / (filter_term + 1.0);
     }
 
-    void FlexDemodulator::updateEnvelope(double sample) {
+    void FlexDemodulator::updateEnvelope(float sample) { // checked
         // Direct port from original C code:
         // flex->Demodulator.envelope_sum += fabs(sample);
         // flex->Demodulator.envelope_count++;
@@ -160,8 +147,7 @@ namespace flex_next_decoder {
         if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "processZeroCrossing called" << std::endl;
         }
-        bool zero_crossing = (last_sample_ < 0.0 && sample >= 0.0) ||
-                             (last_sample_ >= 0.0 && sample < 0.0);
+        bool zero_crossing = (last_sample_ < 0.0 && sample >= 0.0) || (last_sample_ >= 0.0 && sample < 0.0);
 
         if (zero_crossing) {
             // The phase error has a direction towards the closest symbol boundary

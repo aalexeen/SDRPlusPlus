@@ -7,26 +7,30 @@ namespace flex_next_decoder {
     // FlexStateMachine Implementation (Context)
     //=============================================================================
 
-    FlexStateMachine::FlexStateMachine(const FlexStateCallbacks& callbacks)
-        : previous_state_(FlexState::Sync1), fiw_count_(0), sync2_count_(0), data_count_(0), baud_rate_(1600), fiw_raw_data_(0), callbacks_(callbacks) {
+    FlexStateMachine::FlexStateMachine(const FlexStateCallbacks &callbacks) :
+        previous_state_(FlexState::Sync1), fiw_count_(0), sync2_count_(0), data_count_(0), baud_rate_(1600),
+        fiw_raw_data_(0), callbacks_(callbacks) {
 
         initializeStates();
     }
 
-    FlexStateMachine::FlexStateMachine()
-        : previous_state_(FlexState::Sync1), fiw_count_(0), sync2_count_(0), data_count_(0), baud_rate_(1600), fiw_raw_data_(0) {
+    FlexStateMachine::FlexStateMachine() :
+        previous_state_(FlexState::Sync1), fiw_count_(0), sync2_count_(0), data_count_(0), baud_rate_(1600),
+        fiw_raw_data_(0) {
 
         initializeStates();
     }
 
-    FlexStateMachine::FlexStateMachine(int verbosity_level)
-        : FlexNextDecoder(verbosity_level), previous_state_(FlexState::Sync1), fiw_count_(0), sync2_count_(0), data_count_(0), baud_rate_(1600), fiw_raw_data_(0) {
+    FlexStateMachine::FlexStateMachine(int verbosity_level) :
+        FlexNextDecoder(verbosity_level), previous_state_(FlexState::Sync1), fiw_count_(0), sync2_count_(0),
+        data_count_(0), baud_rate_(1600), fiw_raw_data_(0) {
 
         initializeStates();
     }
 
-    FlexStateMachine::FlexStateMachine(const FlexStateCallbacks& callbacks, int verbosity_level)
-        : FlexNextDecoder(verbosity_level), previous_state_(FlexState::Sync1), fiw_count_(0), sync2_count_(0), data_count_(0), baud_rate_(1600), fiw_raw_data_(0), callbacks_(callbacks) {
+    FlexStateMachine::FlexStateMachine(const FlexStateCallbacks &callbacks, int verbosity_level) :
+        FlexNextDecoder(verbosity_level), previous_state_(FlexState::Sync1), fiw_count_(0), sync2_count_(0),
+        data_count_(0), baud_rate_(1600), fiw_raw_data_(0), callbacks_(callbacks) {
 
         initializeStates();
     }
@@ -43,23 +47,20 @@ namespace flex_next_decoder {
         current_state_->onEnter(*this);
     }
 
-    void FlexStateMachine::setCallbacks(const FlexStateCallbacks& callbacks) {
-        callbacks_ = callbacks;
-    }
+    void FlexStateMachine::setCallbacks(const FlexStateCallbacks &callbacks) { callbacks_ = callbacks; }
 
     void FlexStateMachine::processSymbol(uint8_t symbol) {
         // ✅ Delegate to current state (core of State Pattern)
         FlexState next_state = current_state_->processSymbol(*this, symbol);
 
         // ✅ Transition if state changed
-        if (next_state != current_state_->getStateType()) {
-            changeState(next_state);
-        }
+        if (next_state != current_state_->getStateType()) { changeState(next_state); }
     }
 
-    void FlexStateMachine::changeState(FlexState new_state) {
+    void FlexStateMachine::changeState(FlexState new_state) { // checked
         if (getVerbosityLevel() >= 5) {
-            std::cout << typeid(*this).name() << ": " << "changeState called to state: " << getCurrentStateName() << std::endl;
+            std::cout << typeid(*this).name() << ": " << "changeState called to state: " << getCurrentStateName()
+                      << std::endl;
         }
         if (new_state != current_state_->getStateType()) {
             // ✅ Exit current state
@@ -85,16 +86,17 @@ namespace flex_next_decoder {
         fiw_raw_data_ = 0;
     }
 
-    FlexState FlexStateMachine::getCurrentState() const {
+    /*FlexState FlexStateMachine::getCurrentState() const {
         if (getVerbosityLevel() >= 5) {
-            std::cout << typeid(*this).name() << ": " << "getCurrentState called - current state: " << getCurrentStateName() << std::endl;
+            std::cout << typeid(*this).name() << ": " << "getCurrentState called - current state: " <<
+    getCurrentStateName() << std::endl;
         }
         return current_state_->getStateType();
-    }
+    }*/
 
-    std::string FlexStateMachine::getCurrentStateName() const {
+    /*std::string FlexStateMachine::getCurrentStateName() const {
         return current_state_->getStateName();
-    }
+    }*/
 
     void FlexStateMachine::reportStateChange() {
         if (getVerbosityLevel() >= 5) {
@@ -106,15 +108,15 @@ namespace flex_next_decoder {
     // Sync1State Implementation
     //=============================================================================
 
-    void Sync1State::onEnter(FlexStateMachine& context) {
+    void Sync1State::onEnter(FlexStateMachine &context) {
         // Reset when entering SYNC1 (start of new frame)
         context.resetFIWCount();
         context.setFIWRawData(0);
     }
 
-    FlexState Sync1State::processSymbol(FlexStateMachine& context, uint8_t symbol) {
+    FlexState Sync1State::processSymbol(FlexStateMachine &context, uint8_t symbol) {
         // ✅ Look for sync pattern
-        const auto& callbacks = context.getCallbacks();
+        const auto &callbacks = context.getCallbacks();
         if (!callbacks.detect_sync) {
             return FlexState::Sync1; // No sync detector available
         }
@@ -123,9 +125,7 @@ namespace flex_next_decoder {
 
         if (sync_code != 0) {
             // ✅ Sync found! Decode the mode and transition to FIW
-            if (callbacks.decode_sync_mode) {
-                callbacks.decode_sync_mode(sync_code);
-            }
+            if (callbacks.decode_sync_mode) { callbacks.decode_sync_mode(sync_code); }
 
             if (context.getVerbosityLevel() >= 5) {
                 std::cout << "FLEX_NEXT: Sync detected, code=0x" << std::hex << sync_code << std::dec << std::endl;
@@ -141,22 +141,20 @@ namespace flex_next_decoder {
     // FIWState Implementation
     //=============================================================================
 
-    void FIWState::onEnter(FlexStateMachine& context) {
+    void FIWState::onEnter(FlexStateMachine &context) {
         // Reset FIW processing
         context.resetFIWCount();
         context.setFIWRawData(0);
-        if (context.getVerbosityLevel() >= 5) {
-            std::cout << "FLEX_NEXT: Starting FIW collection" << std::endl;
-        }
+        if (context.getVerbosityLevel() >= 5) { std::cout << "FLEX_NEXT: Starting FIW collection" << std::endl; }
     }
 
-    FlexState FIWState::processSymbol(FlexStateMachine& context, uint8_t symbol) {
+    FlexState FIWState::processSymbol(FlexStateMachine &context, uint8_t symbol) {
         // ✅ Increment FIW bit counter
         context.incrementFIWCount();
 
         // ✅ Accumulate FIW data after dotting bits
         if (context.getFIWCount() >= FlexStateMachine::FIW_DOTTING_BITS) {
-            const auto& callbacks = context.getCallbacks();
+            const auto &callbacks = context.getCallbacks();
             if (callbacks.accumulate_fiw) {
                 uint32_t fiw_data = context.getFIWRawData();
                 callbacks.accumulate_fiw(symbol, fiw_data);
@@ -167,20 +165,17 @@ namespace flex_next_decoder {
         // ✅ Check if we have all FIW bits
         if (context.getFIWCount() >= FlexStateMachine::FIW_TOTAL_BITS) {
             // ✅ Process FIW and decide next state
-            const auto& callbacks = context.getCallbacks();
+            const auto &callbacks = context.getCallbacks();
             bool fiw_success = false;
 
-            if (callbacks.process_fiw) {
-                fiw_success = callbacks.process_fiw(context.getFIWRawData());
-            }
+            if (callbacks.process_fiw) { fiw_success = callbacks.process_fiw(context.getFIWRawData()); }
 
             if (fiw_success) {
                 if (context.getVerbosityLevel() >= 5) {
                     std::cout << "FLEX_NEXT: FIW decoded successfully" << std::endl;
                 }
                 return FlexState::Sync2;
-            }
-            else {
+            } else {
                 if (context.getVerbosityLevel() >= 5) {
                     std::cout << "FLEX_NEXT: FIW decode failed, returning to SYNC1" << std::endl;
                 }
@@ -196,7 +191,7 @@ namespace flex_next_decoder {
     // Sync2State Implementation
     //=============================================================================
 
-    void Sync2State::onEnter(FlexStateMachine& context) {
+    void Sync2State::onEnter(FlexStateMachine &context) {
         // Reset SYNC2 counter
         context.resetSync2Count();
         if (context.getVerbosityLevel() >= 5) {
@@ -204,7 +199,7 @@ namespace flex_next_decoder {
         }
     }
 
-    FlexState Sync2State::processSymbol(FlexStateMachine& context, uint8_t symbol) {
+    FlexState Sync2State::processSymbol(FlexStateMachine &context, uint8_t symbol) {
         // ✅ Count SYNC2 symbols
         context.incrementSync2Count();
 
@@ -228,28 +223,22 @@ namespace flex_next_decoder {
     // DataState Implementation
     //=============================================================================
 
-    void DataState::onEnter(FlexStateMachine& context) {
+    void DataState::onEnter(FlexStateMachine &context) {
         // Reset data counter and clear phase buffers
         context.resetDataCount();
 
-        const auto& callbacks = context.getCallbacks();
-        if (callbacks.clear_phase_data) {
-            callbacks.clear_phase_data();
-        }
+        const auto &callbacks = context.getCallbacks();
+        if (callbacks.clear_phase_data) { callbacks.clear_phase_data(); }
 
-        if (context.getVerbosityLevel() >= 5) {
-            std::cout << "FLEX_NEXT: Data collection started" << std::endl;
-        }
+        if (context.getVerbosityLevel() >= 5) { std::cout << "FLEX_NEXT: Data collection started" << std::endl; }
     }
 
-    FlexState DataState::processSymbol(FlexStateMachine& context, uint8_t symbol) {
+    FlexState DataState::processSymbol(FlexStateMachine &context, uint8_t symbol) {
         // ✅ Read data symbol and check for idle
-        const auto& callbacks = context.getCallbacks();
+        const auto &callbacks = context.getCallbacks();
         bool idle_detected = false;
 
-        if (callbacks.read_data) {
-            idle_detected = callbacks.read_data(symbol);
-        }
+        if (callbacks.read_data) { idle_detected = callbacks.read_data(symbol); }
 
         // ✅ Count data symbols
         context.incrementDataCount();
@@ -276,26 +265,22 @@ namespace flex_next_decoder {
         return FlexState::Data;
     }
 
-    void DataState::onExit(FlexStateMachine& context) {
+    void DataState::onExit(FlexStateMachine &context) {
         // ✅ Process collected data when leaving DATA state
-        const auto& callbacks = context.getCallbacks();
-        if (callbacks.process_collected_data) {
-            callbacks.process_collected_data();
-        }
+        const auto &callbacks = context.getCallbacks();
+        if (callbacks.process_collected_data) { callbacks.process_collected_data(); }
 
         // ✅ Reset baud rate to default for next frame
         context.setBaudRate(1600);
 
-        if (context.getVerbosityLevel() >= 5) {
-            std::cout << "FLEX_NEXT: Processing collected FLEX data" << std::endl;
-        }
+        if (context.getVerbosityLevel() >= 5) { std::cout << "FLEX_NEXT: Processing collected FLEX data" << std::endl; }
     }
 
-    void FlexStateMachine::setState(size_t index) {
+    /*void FlexStateMachine::setState(size_t index) {
         if (index < states_.size()) {
             current_state_ = states_[index].get();
         }
-    }
+    }*/
 
 
 } // namespace flex_next_decoder

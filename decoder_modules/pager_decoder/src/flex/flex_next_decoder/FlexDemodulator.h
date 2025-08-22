@@ -37,8 +37,8 @@ namespace flex_next_decoder {
          * @param sample_frequency Input sample rate (typically 22050 Hz)
          */
         explicit FlexDemodulator(uint32_t sample_frequency);
-        FlexDemodulator(FlexStateMachine* flex_state_machine, uint32_t sample_frequency);
-        FlexDemodulator(FlexStateMachine* flex_state_machine, uint32_t sample_frequency, int verbosity_level);
+        FlexDemodulator(FlexStateMachine *flex_state_machine, uint32_t sample_frequency);
+        FlexDemodulator(FlexStateMachine *flex_state_machine, uint32_t sample_frequency, int verbosity_level);
 
         /**
          * @brief Destructor - RAII cleanup
@@ -46,10 +46,10 @@ namespace flex_next_decoder {
         ~FlexDemodulator() = default;
 
         // Non-copyable but moveable (unique signal state)
-        FlexDemodulator(const FlexDemodulator&) = delete;
-        FlexDemodulator& operator=(const FlexDemodulator&) = delete;
-        FlexDemodulator(FlexDemodulator&&) = default;
-        FlexDemodulator& operator=(FlexDemodulator&&) = default;
+        FlexDemodulator(const FlexDemodulator &) = delete;
+        FlexDemodulator &operator=(const FlexDemodulator &) = delete;
+        FlexDemodulator(FlexDemodulator &&) = default;
+        FlexDemodulator &operator=(FlexDemodulator &&) = default;
 
         //=========================================================================
         // Main Signal Processing Interface (matches original buildSymbol)
@@ -64,7 +64,16 @@ namespace flex_next_decoder {
          * Performs complete PLL-based symbol timing recovery and quantization.
          * When true, call getModalSymbol() to get the 4-level FSK symbol (0-3).
          */
-        bool processSample(double sample);
+        // bool processSample(double sample);
+
+        /**
+         * @brief Main symbol timing recovery logic
+         * @param sample Current input sample
+         * @return true when symbol period complete
+         *
+         * Direct port of buildSymbol() function from demod_flex_next.c
+         */
+        bool buildSymbol(float sample);
 
         /**
          * @brief Get most recently detected symbol
@@ -74,9 +83,7 @@ namespace flex_next_decoder {
          * Pass this symbol to FlexDataCollector::processSymbol() for protocol processing.
          */
         uint8_t getModalSymbol() const {
-            if (getVerbosityLevel() >= 5) {
-                std::cout << typeid(*this).name() << "getModalSymbol called" << std::endl;
-            }
+            if (getVerbosityLevel() >= 5) { std::cout << typeid(*this).name() << "getModalSymbol called" << std::endl; }
             return modal_symbol_;
         }
 
@@ -159,22 +166,14 @@ namespace flex_next_decoder {
         //=========================================================================
 
         /**
-         * @brief Main symbol timing recovery logic
-         * @param sample Current input sample
-         * @return true when symbol period complete
-         *
-         * Direct port of buildSymbol() function from demod_flex_next.c
-         */
-        bool buildSymbol(double sample);
-
-        /**
          * @brief Update DC offset removal filter
          * @param sample Raw input sample
          *
          * Equivalent to original IIR filter:
-         * flex->Modulation.zero = (flex->Modulation.zero*(FREQ_SAMP*DC_OFFSET_FILTER) + sample) / ((FREQ_SAMP*DC_OFFSET_FILTER) + 1);
+         * flex->Modulation.zero = (flex->Modulation.zero*(FREQ_SAMP*DC_OFFSET_FILTER) + sample) /
+         * ((FREQ_SAMP*DC_OFFSET_FILTER) + 1);
          */
-        void updateDCOffset(double sample);
+        void updateDCOffset(float sample);
 
         /**
          * @brief Update signal envelope estimate
@@ -182,7 +181,7 @@ namespace flex_next_decoder {
          *
          * Equivalent to envelope calculation during sync periods in original C code.
          */
-        void updateEnvelope(double sample);
+        void updateEnvelope(float sample);
 
         /**
          * @brief Count symbol levels during mid-80% of symbol period
@@ -222,32 +221,32 @@ namespace flex_next_decoder {
         // State Variables (matches original C structures)
         //=========================================================================
 
-        FlexStateMachine* state_machine_; ///< Flex state machine (for callbacks)
+        FlexStateMachine *state_machine_; ///< Flex state machine (for callbacks)
         // Configuration
         uint32_t sample_frequency_; ///< flex->Demodulator.sample_freq
-        uint32_t current_baud_;     ///< flex->Demodulator.baud
+        uint32_t current_baud_; ///< flex->Demodulator.baud
 
         // Sample processing state
-        double last_sample_;    ///< flex->Demodulator.sample_last
-        bool locked_;           ///< flex->Demodulator.locked
-        int64_t phase_;         ///< flex->Demodulator.phase
+        double last_sample_; ///< flex->Demodulator.sample_last
+        bool locked_; ///< flex->Demodulator.locked
+        int64_t phase_; ///< flex->Demodulator.phase
         uint32_t sample_count_; ///< flex->Demodulator.sample_count
         uint32_t symbol_count_; ///< flex->Demodulator.symbol_count
 
         // Signal measurements
-        double zero_offset_;  ///< flex->Modulation.zero
-        double envelope_;     ///< flex->Modulation.envelope
+        double zero_offset_; ///< flex->Modulation.zero
+        double envelope_; ///< flex->Modulation.envelope
         double envelope_sum_; ///< flex->Demodulator.envelope_sum
-        int envelope_count_;  ///< flex->Demodulator.envelope_count
-        double symbol_rate_;  ///< flex->Modulation.symbol_rate
+        int envelope_count_; ///< flex->Demodulator.envelope_count
+        double symbol_rate_; ///< flex->Modulation.symbol_rate
 
         // Symbol detection
         std::array<int, 4> symbol_counts_; ///< flex->Demodulator.symcount[]
-        uint8_t modal_symbol_;             ///< Most recently detected symbol
-        uint64_t lock_buffer_;             ///< flex->Demodulator.lock_buf
+        uint8_t modal_symbol_; ///< Most recently detected symbol
+        uint64_t lock_buffer_; ///< flex->Demodulator.lock_buf
 
         // Error monitoring
-        int timeout_counter_;         ///< flex->Demodulator.timeout
+        int timeout_counter_; ///< flex->Demodulator.timeout
         int non_consecutive_counter_; ///< flex->Demodulator.nonconsec
 
 
@@ -255,12 +254,12 @@ namespace flex_next_decoder {
         // Constants (from original C #defines)
         //=========================================================================
 
-        static constexpr double SLICE_THRESHOLD = 0.667;                ///< SLICE_THRESHOLD
-        static constexpr double DC_OFFSET_FILTER = 0.010;               ///< DC_OFFSET_FILTER
-        static constexpr double PHASE_LOCKED_RATE = 0.045;              ///< PHASE_LOCKED_RATE
-        static constexpr double PHASE_UNLOCKED_RATE = 0.050;            ///< PHASE_UNLOCKED_RATE
-        static constexpr int LOCK_LENGTH = 24;                          ///< LOCK_LEN
-        static constexpr int DEMOD_TIMEOUT = 100;                       ///< DEMOD_TIMEOUT
+        static constexpr double SLICE_THRESHOLD = 0.667; ///< SLICE_THRESHOLD
+        static constexpr double DC_OFFSET_FILTER = 0.010; ///< DC_OFFSET_FILTER
+        static constexpr double PHASE_LOCKED_RATE = 0.045; ///< PHASE_LOCKED_RATE
+        static constexpr double PHASE_UNLOCKED_RATE = 0.050; ///< PHASE_UNLOCKED_RATE
+        static constexpr int LOCK_LENGTH = 24; ///< LOCK_LEN
+        static constexpr int DEMOD_TIMEOUT = 100; ///< DEMOD_TIMEOUT
         static constexpr uint64_t LOCK_PATTERN = 0x6666666666666666ULL; ///< From original C
     };
 
