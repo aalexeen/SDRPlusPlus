@@ -133,11 +133,22 @@ namespace flex_next_decoder {
         // Step 1: Signal processing and symbol recovery
         if (demodulator_->buildSymbol(sample)) {
             // Symbol period complete - get the detected symbol
-            uint8_t symbol = demodulator_->getModalSymbol();
+            demodulator_->finalizeSymbol();
 
-            // Step 2: Process symbol through state machine coordination
-            processSymbol(symbol);
+            if (demodulator_->isLocked()) {
+                // Step 2: Process symbol through state machine coordination
+                processSymbol(demodulator_->getModalSymbol());
+            } else {
+                if (getVerbosityLevel() >= 3) {
+                    std::cout << "FLEX_NEXT: Symbol not locked" << std::endl;
+                }
+                demodulator_->checkLockPattern(); // checked
+            }
+
+            demodulator_->timeout(); // checked
         }
+
+        // original code report_state - changing Previous state to Current in state machine. Keep it in mind to implement later.
     }
 
     void FlexDecoder::processSymbol(uint8_t symbol) { // checked, original code flex_sym

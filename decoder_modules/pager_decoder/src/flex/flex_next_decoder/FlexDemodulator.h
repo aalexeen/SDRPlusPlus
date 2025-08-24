@@ -82,10 +82,28 @@ namespace flex_next_decoder {
          * Should be called immediately after processSample() returns true.
          * Pass this symbol to FlexDataCollector::processSymbol() for protocol processing.
          */
+
+        /**
+         * @brief Determine modal symbol and check for lock pattern
+         *
+         * Combines modal symbol detection and lock pattern checking from
+         * original Flex_Demodulate() function.
+         */
+        void finalizeSymbol();
+
+        /**
+         * @brief Check symbol stream for lock pattern
+         *
+         * Equivalent to lock pattern detection in original Flex_Demodulate().
+         */
+        void checkLockPattern();
+
         uint8_t getModalSymbol() const {
             if (getVerbosityLevel() >= 5) { std::cout << typeid(*this).name() << "getModalSymbol called" << std::endl; }
             return modal_symbol_;
         }
+
+        void timeout();
 
         //=========================================================================
         // Lock Management (matches original C behavior)
@@ -190,7 +208,7 @@ namespace flex_next_decoder {
          *
          * Equivalent to symcount[] updates in original C code.
          */
-        void countSymbolLevels(double sample, double phase_percent);
+        void countSymbolLevels(float sample);
 
         /**
          * @brief Process zero crossings for PLL correction
@@ -200,22 +218,7 @@ namespace flex_next_decoder {
          *
          * Direct port of zero crossing logic from original buildSymbol().
          */
-        void processZeroCrossing(double sample, double phase_percent, int64_t phase_max);
-
-        /**
-         * @brief Determine modal symbol and check for lock pattern
-         *
-         * Combines modal symbol detection and lock pattern checking from
-         * original Flex_Demodulate() function.
-         */
-        void finalizeSymbol();
-
-        /**
-         * @brief Check symbol stream for lock pattern
-         *
-         * Equivalent to lock pattern detection in original Flex_Demodulate().
-         */
-        void checkLockPattern();
+        void processZeroCrossing(float sample, double phase_percent, int64_t phase_max);
 
         //=========================================================================
         // State Variables (matches original C structures)
