@@ -31,13 +31,13 @@ BCHCode::BCHCode(const int *p, int m, int n, int k, int t) : m_(m), n_(n), k_(k)
     generateGaloisField();
 
     // Debug: Print first few GF table entries
-    std::cout << "DEBUG GF: First 10 alpha_to_ entries: ";
+    /*std::cout << "DEBUG GF: First 10 alpha_to_ entries: ";
     for (int i = 0; i < std::min(10, n_); i++) { std::cout << alpha_to_[i] << " "; }
     std::cout << std::endl;
 
     std::cout << "DEBUG GF: First 10 index_of_ entries: ";
     for (int i = 0; i < std::min(10, n_); i++) { std::cout << index_of_[i] << " "; }
-    std::cout << std::endl;
+    std::cout << std::endl;*/
 
     // Generate BCH generator polynomial
     generatePolynomial();
@@ -240,10 +240,10 @@ int BCHCode::decode(int *received) {
     }
 
     // Only print debug for actual errors
-    if (syn_error) {
+    /*if (syn_error) {
         std::cout << "DEBUG BCH: syn_error=" << syn_error << " s[1]=" << s[1] << " s[2]=" << s[2] << " s[3]=" << s[3]
                   << " s[4]=" << s[4] << std::endl;
-    }
+    }*/
 
     if (syn_error) {
         if (s[1] != -1) {
@@ -251,10 +251,10 @@ int BCHCode::decode(int *received) {
             if (s[3] == s3) {
                 // Single error case
                 received[s[1]] ^= 1;
-                std::cout << "DEBUG BCH: Single error corrected at position " << s[1] << std::endl;
+                //std::cout << "DEBUG BCH: Single error corrected at position " << s[1] << std::endl;
             } else {
                 // Two error case - ADD COMPREHENSIVE DEBUGGING
-                std::cout << "DEBUG BCH: Two-error case - s3=" << s3 << " s[3]=" << s[3] << std::endl;
+                //std::cout << "DEBUG BCH: Two-error case - s3=" << s3 << " s[3]=" << s[3] << std::endl;
 
                 if (s[3] != -1) {
                     aux = alpha_to_[s3] ^ alpha_to_[s[3]];
@@ -268,7 +268,7 @@ int BCHCode::decode(int *received) {
 
                 // Check if aux is valid
                 if (aux == 0 || index_of_[aux] == -1) {
-                    std::cout << "DEBUG BCH: Invalid aux calculation - uncorrectable" << std::endl;
+                    //std::cout << "DEBUG BCH: Invalid aux calculation - uncorrectable" << std::endl;
                     retval = 1;
                 } else {
                     elp[0] = 0;
@@ -309,16 +309,16 @@ int BCHCode::decode(int *received) {
 
                     if (count == 2) {
                         for (int i = 0; i < 2; i++) { received[loc[i]] ^= 1; }
-                        std::cout << "DEBUG BCH: Two errors corrected at positions " << loc[0] << " and " << loc[1]
-                                  << std::endl;
+                        /*std::cout << "DEBUG BCH: Two errors corrected at positions " << loc[0] << " and " << loc[1]
+                                  << std::endl;*/
                     } else {
-                        std::cout << "DEBUG BCH: Expected 2 errors but found " << count << std::endl;
+                        //std::cout << "DEBUG BCH: Expected 2 errors but found " << count << std::endl;
                         retval = 1;
                     }
                 }
             }
         } else if (s[2] != -1) {
-            std::cout << "DEBUG BCH: Error detection case" << std::endl;
+            //std::cout << "DEBUG BCH: Error detection case" << std::endl;
             retval = 1;
         }
     }

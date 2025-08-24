@@ -213,7 +213,9 @@ namespace flex_next_decoder {
         uint64_t lock_mask = (1ULL << (2 * LOCK_LENGTH)) - 1;
 
         if ((lock_pattern & lock_mask) == 0 || ((~lock_pattern) & lock_mask) == 0) {
-            std::cout << "FLEX_NEXT: Locked\n";
+            if (getVerbosityLevel() >= 3) {
+                std::cout << "FLEX_NEXT: Locked\n";
+            }
             locked_ = true;
 
             // Clear the synchronisation buffer (from original C code)

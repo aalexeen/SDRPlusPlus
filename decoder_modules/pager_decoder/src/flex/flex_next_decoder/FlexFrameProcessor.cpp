@@ -224,7 +224,7 @@ namespace flex_next_decoder {
             phase_data[i] &= MESSAGE_BITS_MASK;
         }
 
-        if (verbosity_level_ >= 2 && (failed_words > 0 || corrected_words > 0)) {
+        if (verbosity_level_ >= 3 && (failed_words > 0 || corrected_words > 0)) {
             std::cout << "FLEX_NEXT: Phase " << phase_name << " - Clean:" << clean_words
                       << " Corrected:" << corrected_words << " Failed:" << failed_words
                       << " Total:" << phase_data.size() << std::endl;
@@ -234,7 +234,7 @@ namespace flex_next_decoder {
         // In real FLEX systems, some corruption is normal
         bool success = (failed_words <= (int) phase_data.size() / 2);
 
-        if (!success && verbosity_level_ >= 1) {
+        if (!success && verbosity_level_ >= 3) {
             std::cout << "FLEX_NEXT: Phase " << phase_name << " abandoned - too many uncorrectable words ("
                       << failed_words << "/" << phase_data.size() << ")" << std::endl;
         }
@@ -264,11 +264,11 @@ namespace flex_next_decoder {
 
         // Validate structure
         if (biw.vector_offset < biw.address_offset) {
-            if (verbosity_level_ >= 1) { std::cout << "Invalid structure: " << biw.raw_data << std::endl; }
+            if (verbosity_level_ >= 3) { std::cout << "Invalid structure: " << biw.raw_data << std::endl; }
             return biw; // Invalid structure
         }
 
-        if (verbosity_level_ >= 2) {
+        if (verbosity_level_ >= 3) {
             std::cout << "FLEX_NEXT: BlockInfoWord: (Phase " << phase_name << ") BIW:" << std::hex << biw.raw_data
                       << " AW " << std::dec << biw.address_offset << " VW " << biw.vector_offset << " (up to "
                       << biw.max_pages << " pages)" << std::endl;

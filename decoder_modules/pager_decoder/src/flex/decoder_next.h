@@ -87,7 +87,7 @@ public:
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Debug output level:\n0 = Silent\n1 = Errors only\n2 = Info + Errors\n3 = Debug info\n4 "
-                              "= Verbose debug\n5 = Very verbose");
+                "= Verbose debug\n5 = Very verbose");
         }
 
         if (ImGui::Button("Reset Decoder")) { resetDecoder(); }
@@ -187,9 +187,9 @@ private:
         total_samples += count;
 
         // Log every 22050 samples (1 second worth)
-        if (total_samples % 22050 < count) {
+        /*if (total_samples % 22050 < count) {
             flog::info("Audio handler: {} samples this call, {} total", count, total_samples);
-        }
+        }*/
 
         FLEXDecoderNext *_this = (FLEXDecoderNext *) ctx;
         if (_this && _this->initialized) { _this->processAudioSamples(data, count); }
@@ -206,9 +206,10 @@ private:
         static int sample_counter = 0;
         sample_counter += count;
 
-        if (sample_counter % (44100 * 5) == 0) { // Log every 5 seconds
+        /*if (sample_counter % (44100 * 5) == 0) {
+            // Log every 5 seconds
             flog::info("FLEX decoder received {} samples (total: {})", count, sample_counter);
-        }
+        }*/
 
         try {
             // Process samples in smaller chunks to avoid overflow
@@ -252,12 +253,12 @@ private:
     void initFLEXDecoder() {
         try {
             // Initialize BCH error correction
-            static const int primitive_poly[] = { 1, 0, 1, 0, 0, 1 }; // Example for BCH(31,21,5)
+            static const int primitive_poly[] = {1, 0, 1, 0, 0, 1}; // Example for BCH(31,21,5)
             bchDecoder = std::make_unique<BCHCode>(primitive_poly, 5, 31, 21, 2);
 
             // Initialize FLEX decoder next
             flexDecoderNext = std::make_unique<flex_next_decoder::FlexDecoder>(
-                    static_cast<uint32_t>(PAGER_AUDIO_SAMPLERATE), verbosity_level_);
+                static_cast<uint32_t>(PAGER_AUDIO_SAMPLERATE), verbosity_level_);
             /*flexDecoderNext->setMessageCallback([this](int64_t addr, int type, const std::string& data) {
                 handleFlexMessage(addr, type, data);
             });*/

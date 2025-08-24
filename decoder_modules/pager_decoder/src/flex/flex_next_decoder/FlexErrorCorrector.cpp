@@ -86,9 +86,11 @@ namespace flex_next_decoder {
             uint32_t errors_fixed = countBits(error_mask);
 
             if (errors_fixed > 0) {
-                std::cout << "FLEX_NEXT: Phase " << phase_id << " Fixed " << errors_fixed << " errors @ 0x" << std::hex
-                          << error_mask << " (0x" << std::hex << (data & 0x7FFFFFFF) << " -> 0x" << std::hex
-                          << corrected_data << ")" << std::dec << std::endl;
+                if (verbosity_level_ >= 3) {
+                    std::cout << "FLEX_NEXT: Phase " << phase_id << " Fixed " << errors_fixed << " errors @ 0x" << std::hex
+                              << error_mask << " (0x" << std::hex << (data & 0x7FFFFFFF) << " -> 0x" << std::hex
+                              << corrected_data << ")" << std::dec << std::endl;
+                }
             }
 
             // Write corrected data back to caller
@@ -97,8 +99,10 @@ namespace flex_next_decoder {
         } else {
             // Only log failures for non-zero data to reduce spam
             if (data != 0) {
-                std::cout << "FLEX_NEXT: Phase " << phase_id << " Data corruption - Unable to fix errors (0x"
-                          << std::hex << data << std::dec << ")." << std::endl;
+                if (verbosity_level_ >= 3) {
+                    std::cout << "FLEX_NEXT: Phase " << phase_id << " Data corruption - Unable to fix errors (0x"
+                              << std::hex << data << std::dec << ")." << std::endl;
+                }
             }
             return false;
         }

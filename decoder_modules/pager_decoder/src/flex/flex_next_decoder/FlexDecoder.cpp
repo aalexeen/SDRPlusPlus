@@ -198,7 +198,7 @@ namespace flex_next_decoder {
                 // data_collector_->setTransmissionMode(sync_info.baud_rate, sync_info.levels); // it is no necessary in
                 // original code
 
-                if (getVerbosityLevel() >= 2) {
+                if (getVerbosityLevel() >= 3) {
                     std::cout << "FLEX_NEXT: SyncInfoWord: sync_code=0x" << std::hex << sync_code
                               << " baud=" << sync_info_.baud_rate << " levels=" << sync_info_.levels
                               << " polarity=" << (sync_info_.polarity ? "NEG" : "POS") << std::dec << std::endl;
@@ -250,7 +250,7 @@ namespace flex_next_decoder {
                                     ((corrected_fiw >> 16) & 0xF) + ((corrected_fiw >> 20) & 0x01);
 
                 if ((checksum & 0xF) == 0xF) {
-                    if (getVerbosityLevel() >= 2) {
+                    if (getVerbosityLevel() >= 3) {
                         int time_seconds = cycle_no * 4 * 60 + frame_no * 4 * 60 / 128;
                         std::cout << "FLEX_NEXT: FrameInfoWord: cycleno=" << cycle_no << " frameno=" << frame_no
                                   << " fix3=" << fix3 << " time=" << (time_seconds / 60) << ":" << (time_seconds % 60)
@@ -308,7 +308,7 @@ namespace flex_next_decoder {
             data_count_ = 0;
             data_collector_->reset(); // Clear phase buffers
 
-            if (getVerbosityLevel() >= 2) { std::cout << "FLEX_NEXT: State: DATA" << std::endl; }
+            if (getVerbosityLevel() >= 3) { std::cout << "FLEX_NEXT: State: DATA" << std::endl; }
         }
     }
 

@@ -58,7 +58,7 @@ namespace flex_next_decoder {
     }
 
     void FlexStateMachine::changeState(FlexState new_state) { // checked
-        if (getVerbosityLevel() >= 5) {
+        if (verbosity_level_ >= 5) {
             std::cout << typeid(*this).name() << ": " << "changeState called to state: " << getCurrentStateName()
                       << std::endl;
         }
@@ -99,7 +99,7 @@ namespace flex_next_decoder {
     }*/
 
     void FlexStateMachine::reportStateChange() {
-        if (getVerbosityLevel() >= 5) {
+        if (verbosity_level_ >= 3) {
             std::cout << typeid(*this).name() << " FLEX_NEXT: State: " << getCurrentStateName() << std::endl;
         }
     }

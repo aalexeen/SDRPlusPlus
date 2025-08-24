@@ -104,17 +104,21 @@ namespace flex_next_decoder {
                 sync_info.baud_rate = mode.baud_rate;
                 sync_info.levels = mode.levels;
 
-                std::cout << "FLEX_NEXT: SyncInfoWord: sync_code=0x" << std::hex << sync_code
-                          << " baud=" << std::dec << sync_info.baud_rate
-                          << " levels=" << sync_info.levels
-                          << " polarity=" << (sync_info.polarity ? "NEG" : "POS") << std::endl;
+                if (verbosity_level_ >= 3) {
+                    std::cout << "FLEX_NEXT: SyncInfoWord: sync_code=0x" << std::hex << sync_code
+                              << " baud=" << std::dec << sync_info.baud_rate
+                              << " levels=" << sync_info.levels
+                              << " polarity=" << (sync_info.polarity ? "NEG" : "POS") << std::endl;
+                }
                 return true;
             }
         }
 
         // ✅ Unknown sync code - use default fallback
-        std::cout << "FLEX_NEXT: Unknown sync code 0x" << std::hex << sync_code
-                  << ", defaulting to 1600bps 2FSK" << std::dec << std::endl;
+        if (verbosity_level_ >= 3) {
+            std::cout << "FLEX_NEXT: Unknown sync code 0x" << std::hex << sync_code
+                      << ", defaulting to 1600bps 2FSK" << std::dec << std::endl;
+        }
 
         // sync_info.baud_rate = 1600;
         // sync_info.levels = 2;
