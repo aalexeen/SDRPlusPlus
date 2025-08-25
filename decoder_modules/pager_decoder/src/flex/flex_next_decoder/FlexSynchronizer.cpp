@@ -3,17 +3,16 @@
 
 namespace flex_next_decoder {
 
-    FlexSynchronizer::FlexSynchronizer()
-        : sync_buffer_(0), last_polarity_(false), symbol_count_(0) {
-    }
+    FlexSynchronizer::FlexSynchronizer() : sync_buffer_(0), last_polarity_(false), symbol_count_(0) {}
 
-    FlexSynchronizer::FlexSynchronizer(int verbosity_level)
-        : FlexNextDecoder(verbosity_level), sync_buffer_(0), last_polarity_(false), symbol_count_(0) {
-    }
+    FlexSynchronizer::FlexSynchronizer(int verbosity_level) :
+        FlexNextDecoder(verbosity_level), sync_buffer_(0), last_polarity_(false), symbol_count_(0) {}
 
+    // flex_sync
     uint32_t FlexSynchronizer::processSymbol(uint8_t symbol) { // checked
         if (getVerbosityLevel() >= 5) {
-            std::cout << typeid(*this).name() << ": " << "processSymbol called with symbol: " << static_cast<int>(symbol) << std::endl;
+            std::cout << typeid(*this).name() << ": "
+                      << "processSymbol called with symbol: " << static_cast<int>(symbol) << std::endl;
         }
         // ✅ Increment symbol counter
         symbol_count_++;
@@ -24,14 +23,14 @@ namespace flex_next_decoder {
         sync_buffer_ = (sync_buffer_ << 1) | bit;
 
         // ✅ Check for positive polarity sync pattern first
-        uint32_t sync_code = checkSyncPattern(sync_buffer_);
+        uint32_t sync_code = checkSyncPattern(sync_buffer_); // checked
         if (sync_code != 0) {
             last_polarity_ = false; // Normal polarity
             return sync_code;
         }
 
         // ✅ Check for negative polarity (inverted signal)
-        sync_code = checkSyncPattern(~sync_buffer_);
+        sync_code = checkSyncPattern(~sync_buffer_); // checked
         if (sync_code != 0) {
             last_polarity_ = true; // Inverted polarity
             return sync_code;
@@ -47,7 +46,8 @@ namespace flex_next_decoder {
         // BBBBBBBB = middle 32 bits (marker)
         // CCCC = lower 16 bits (codelow, inverted)
         if (getVerbosityLevel() >= 5) {
-            std::cout << typeid(FlexSynchronizer).name() << ": " << "checkSyncPattern called with buffer: " << std::hex << buffer << std::dec << std::endl;
+            std::cout << typeid(FlexSynchronizer).name() << ": " << "checkSyncPattern called with buffer: " << std::hex
+                      << buffer << std::dec << std::endl;
         }
 
         uint32_t marker = static_cast<uint32_t>((buffer & MARKER_MASK) >> MARKER_SHIFT);
@@ -60,14 +60,15 @@ namespace flex_next_decoder {
             return 0;
         }*/
 
+        // HAMMING_THRESHOLD = 4
         // ✅ Check marker field with hamming distance < 4
-        if (countBitDifferences(marker, SYNC_MARKER) >= HAMMING_THRESHOLD) {
+        if (countBitDifferences(marker, SYNC_MARKER) >= HAMMING_THRESHOLD) { // checked
             return 0;
         }
 
         // ✅ Check outer code with hamming distance < 4
         // codelow is already inverted in validateSyncStructure
-        if (countBitDifferences(codehigh, codelow) >= HAMMING_THRESHOLD) {
+        if (countBitDifferences(codehigh, codelow) >= HAMMING_THRESHOLD) { // checked
             return 0;
         }
 
@@ -91,14 +92,16 @@ namespace flex_next_decoder {
         return true; // Structure is always extractable
     }*/
 
-    bool FlexSynchronizer::decodeSyncMode(uint32_t sync_code, SyncInfo& sync_info) { // checked (original analog decode_mode
+    // decode_mode
+    bool FlexSynchronizer::decodeSyncMode(uint32_t sync_code,
+                                          SyncInfo &sync_info) { // checked
         // ✅ Clear output structure
         sync_info = {};
         sync_info.sync_code = sync_code;
         sync_info.polarity = last_polarity_;
 
         // ✅ Find matching FLEX mode using hamming distance
-        for (const auto& mode : FLEX_MODES) {
+        for (const auto &mode: FLEX_MODES) {
             if (countBitDifferences(mode.sync_code, sync_code) < HAMMING_THRESHOLD) {
                 sync_info.sync_code = mode.sync_code;
                 sync_info.baud_rate = mode.baud_rate;
@@ -106,8 +109,7 @@ namespace flex_next_decoder {
 
                 if (verbosity_level_ >= 3) {
                     std::cout << "FLEX_NEXT: SyncInfoWord: sync_code=0x" << std::hex << sync_code
-                              << " baud=" << std::dec << sync_info.baud_rate
-                              << " levels=" << sync_info.levels
+                              << " baud=" << std::dec << sync_info.baud_rate << " levels=" << sync_info.levels
                               << " polarity=" << (sync_info.polarity ? "NEG" : "POS") << std::endl;
                 }
                 return true;
@@ -116,8 +118,8 @@ namespace flex_next_decoder {
 
         // ✅ Unknown sync code - use default fallback
         if (verbosity_level_ >= 3) {
-            std::cout << "FLEX_NEXT: Unknown sync code 0x" << std::hex << sync_code
-                      << ", defaulting to 1600bps 2FSK" << std::dec << std::endl;
+            std::cout << "FLEX_NEXT: Unknown sync code 0x" << std::hex << sync_code << ", defaulting to 1600bps 2FSK"
+                      << std::dec << std::endl;
         }
 
         // sync_info.baud_rate = 1600;
@@ -136,19 +138,15 @@ namespace flex_next_decoder {
     //=============================================================================
 
     bool FlexSynchronizer::isValidSyncCode(uint32_t sync_code) {
-        for (const auto& mode : FLEX_MODES) {
-            if (countBitDifferences(mode.sync_code, sync_code) < HAMMING_THRESHOLD) {
-                return true;
-            }
+        for (const auto &mode: FLEX_MODES) {
+            if (countBitDifferences(mode.sync_code, sync_code) < HAMMING_THRESHOLD) { return true; }
         }
         return false;
     }
 
     FlexMode FlexSynchronizer::getSyncModeInfo(uint32_t sync_code) {
-        for (const auto& mode : FLEX_MODES) {
-            if (countBitDifferences(mode.sync_code, sync_code) < HAMMING_THRESHOLD) {
-                return mode;
-            }
+        for (const auto &mode: FLEX_MODES) {
+            if (countBitDifferences(mode.sync_code, sync_code) < HAMMING_THRESHOLD) { return mode; }
         }
 
         // ✅ Return default mode if not found

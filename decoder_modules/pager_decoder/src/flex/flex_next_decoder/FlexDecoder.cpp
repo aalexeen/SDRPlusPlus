@@ -139,16 +139,15 @@ namespace flex_next_decoder {
                 // Step 2: Process symbol through state machine coordination
                 processSymbol(demodulator_->getModalSymbol());
             } else {
-                if (getVerbosityLevel() >= 3) {
-                    std::cout << "FLEX_NEXT: Symbol not locked" << std::endl;
-                }
+                if (getVerbosityLevel() >= 3) { std::cout << "FLEX_NEXT: Symbol not locked" << std::endl; }
                 demodulator_->checkLockPattern(); // checked
             }
 
             demodulator_->timeout(); // checked
         }
 
-        // original code report_state - changing Previous state to Current in state machine. Keep it in mind to implement later.
+        // original code report_state - changing Previous state to Current in state machine. Keep it in mind to
+        // implement later.
     }
 
     void FlexDecoder::processSymbol(uint8_t symbol) { // checked, original code flex_sym
@@ -208,6 +207,8 @@ namespace flex_next_decoder {
                 state_machine_->changeState(FlexState::FIW);
                 // fiw_count_ = 0;
                 // fiw_raw_data_ = 0;
+            } else {
+                state_machine_->changeState(FlexState::Sync1);
             }
         } else {
             // No sync pattern detected - transition to SYNC1 state
@@ -217,6 +218,7 @@ namespace flex_next_decoder {
         fiw_count_ = 0;
         fiw_raw_data_ = 0;
         state_machine_->setFIWCount(0);
+        state_machine_->setFIWRawData(0);
     }
 
     void FlexDecoder::handleFIWState(uint8_t symbol, u_char sym_rectified, SyncInfo &sync_info) { // checked so so
@@ -230,7 +232,8 @@ namespace flex_next_decoder {
         // Skip 16 bits of dotting, then accumulate 32 bits of FIW
         if (fiw_count_ >= FIW_DOTTING_BITS) {
             // Accumulate FIW data (2FSK only for FIW)
-            fiw_raw_data_ = (fiw_raw_data_ >> 1) | ((sym_rectified > 1) ? 0x80000000 : 0);
+            fiw_raw_data_ = (fiw_raw_data_ >> 1) | ((sym_rectified > 1) ? 0x80000000 : 0); // checked
+            state_machine_->setFIWRawData(fiw_raw_data_);
         }
 
         if (fiw_count_ == FIW_TOTAL_BITS) {

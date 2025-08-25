@@ -43,6 +43,7 @@ namespace flex_next_decoder {
         }
     }
 
+    // bch3121_fix_errors
     bool FlexErrorCorrector::fixErrors(uint32_t &data, char phase_id) {
         // Convert 32-bit data word to BCH coefficient array format
         // Extract bits from MSB to LSB (bit 30 down to bit 0)
@@ -54,6 +55,7 @@ namespace flex_next_decoder {
             std::cout << "DEBUG: Input data=0x" << std::hex << data << std::dec << std::endl;
         }
 
+        /*Convert the data pattern into an array of coefficients*/
         for (int i = 0; i < 31; i++) {
             received[i] = (temp_data >> 30) & 1; // Extract MSB
             temp_data <<= 1; // Shift left for next bit
@@ -67,7 +69,7 @@ namespace flex_next_decoder {
         }
 
         // Apply BCH error correction
-        int decode_result = bch_code_->decode(received.data());
+        int decode_result = bch_code_->decode(received.data()); // checked
 
         if (data != 0 && verbosity_level_ >= 3) {
             std::cout << "DEBUG: BCH decode result=" << decode_result << std::endl;
@@ -87,9 +89,9 @@ namespace flex_next_decoder {
 
             if (errors_fixed > 0) {
                 if (verbosity_level_ >= 3) {
-                    std::cout << "FLEX_NEXT: Phase " << phase_id << " Fixed " << errors_fixed << " errors @ 0x" << std::hex
-                              << error_mask << " (0x" << std::hex << (data & 0x7FFFFFFF) << " -> 0x" << std::hex
-                              << corrected_data << ")" << std::dec << std::endl;
+                    std::cout << "FLEX_NEXT: Phase " << phase_id << " Fixed " << errors_fixed << " errors @ 0x"
+                              << std::hex << error_mask << " (0x" << std::hex << (data & 0x7FFFFFFF) << " -> 0x"
+                              << std::hex << corrected_data << ")" << std::dec << std::endl;
                 }
             }
 

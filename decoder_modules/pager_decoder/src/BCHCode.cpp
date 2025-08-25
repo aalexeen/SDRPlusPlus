@@ -214,7 +214,8 @@ void BCHCode::encode(int *data) {
     }
 }
 
-int BCHCode::decode(int *received) {
+// BCHCode_Decode
+int BCHCode::decode(int *received) { // checked
     /*
      * We do not need the Berlekamp algorithm to decode.
      * We solve beforehand two equations in two variables.
@@ -251,10 +252,10 @@ int BCHCode::decode(int *received) {
             if (s[3] == s3) {
                 // Single error case
                 received[s[1]] ^= 1;
-                //std::cout << "DEBUG BCH: Single error corrected at position " << s[1] << std::endl;
+                // std::cout << "DEBUG BCH: Single error corrected at position " << s[1] << std::endl;
             } else {
                 // Two error case - ADD COMPREHENSIVE DEBUGGING
-                //std::cout << "DEBUG BCH: Two-error case - s3=" << s3 << " s[3]=" << s[3] << std::endl;
+                // std::cout << "DEBUG BCH: Two-error case - s3=" << s3 << " s[3]=" << s[3] << std::endl;
 
                 if (s[3] != -1) {
                     aux = alpha_to_[s3] ^ alpha_to_[s[3]];
@@ -267,58 +268,58 @@ int BCHCode::decode(int *received) {
                 }
 
                 // Check if aux is valid
-                if (aux == 0 || index_of_[aux] == -1) {
+                /*if (aux == 0 || index_of_[aux] == -1) {
                     //std::cout << "DEBUG BCH: Invalid aux calculation - uncorrectable" << std::endl;
                     retval = 1;
-                } else {
-                    elp[0] = 0;
-                    elp[1] = (s[2] - index_of_[aux] + n_) % n_;
-                    elp[2] = (s[1] - index_of_[aux] + n_) % n_;
+                } else {*/
+                elp[0] = 0;
+                elp[1] = (s[2] - index_of_[aux] + n_) % n_;
+                elp[2] = (s[1] - index_of_[aux] + n_) % n_;
 
-                    /*std::cout << "DEBUG BCH: Error locator polynomial: elp[0]=" << elp[0] << " elp[1]=" << elp[1]
-                              << " elp[2]=" << elp[2] << std::endl;*/
+                /*std::cout << "DEBUG BCH: Error locator polynomial: elp[0]=" << elp[0] << " elp[1]=" << elp[1]
+                          << " elp[2]=" << elp[2] << std::endl;*/
 
-                    // Chien search with detailed debugging
-                    for (int i = 1; i <= 2; i++) { reg[i] = elp[i]; }
-                    count = 0;
+                // Chien search with detailed debugging
+                for (int i = 1; i <= 2; i++) { reg[i] = elp[i]; }
+                count = 0;
 
-                    /*std::cout << "DEBUG BCH: Starting Chien search..." << std::endl;*/
-                    for (int i = 1; i <= n_; i++) {
-                        int q = 1;
-                        for (int j = 1; j <= 2; j++) {
-                            if (reg[j] != -1) {
-                                reg[j] = (reg[j] + j) % n_;
-                                q ^= alpha_to_[reg[j]];
-                            }
+                /*std::cout << "DEBUG BCH: Starting Chien search..." << std::endl;*/
+                for (int i = 1; i <= n_; i++) {
+                    int q = 1;
+                    for (int j = 1; j <= 2; j++) {
+                        if (reg[j] != -1) {
+                            reg[j] = (reg[j] + j) % n_;
+                            q ^= alpha_to_[reg[j]];
                         }
-                        if (!q) {
-                            loc[count] = i % n_;
-                            count++;
-                            /*std::cout << "DEBUG BCH: Found error location at i=" << i << " position=" << (i % n_)
-                                      << std::endl;*/
-                        }
-                        // Debug first few iterations
-                        /*if (i <= 5) {
-                            std::cout << "DEBUG BCH: i=" << i << " q=" << q << " reg[1]=" << reg[1]
-                                      << " reg[2]=" << reg[2] << std::endl;
-                        }*/
                     }
-
-                    // std::cout << "DEBUG BCH: Chien search complete. Found " << count << " error locations" <<
-                    // std::endl;
-
-                    if (count == 2) {
-                        for (int i = 0; i < 2; i++) { received[loc[i]] ^= 1; }
-                        /*std::cout << "DEBUG BCH: Two errors corrected at positions " << loc[0] << " and " << loc[1]
+                    if (!q) {
+                        loc[count] = i % n_;
+                        count++;
+                        /*std::cout << "DEBUG BCH: Found error location at i=" << i << " position=" << (i % n_)
                                   << std::endl;*/
-                    } else {
-                        //std::cout << "DEBUG BCH: Expected 2 errors but found " << count << std::endl;
-                        retval = 1;
                     }
+                    // Debug first few iterations
+                    /*if (i <= 5) {
+                        std::cout << "DEBUG BCH: i=" << i << " q=" << q << " reg[1]=" << reg[1]
+                                  << " reg[2]=" << reg[2] << std::endl;
+                    }*/
                 }
+
+                // std::cout << "DEBUG BCH: Chien search complete. Found " << count << " error locations" <<
+                // std::endl;
+
+                if (count == 2) {
+                    for (int i = 0; i < 2; i++) { received[loc[i]] ^= 1; }
+                    /*std::cout << "DEBUG BCH: Two errors corrected at positions " << loc[0] << " and " << loc[1]
+                              << std::endl;*/
+                } else {
+                    // std::cout << "DEBUG BCH: Expected 2 errors but found " << count << std::endl;
+                    retval = 1;
+                }
+                //}
             }
         } else if (s[2] != -1) {
-            //std::cout << "DEBUG BCH: Error detection case" << std::endl;
+            // std::cout << "DEBUG BCH: Error detection case" << std::endl;
             retval = 1;
         }
     }
