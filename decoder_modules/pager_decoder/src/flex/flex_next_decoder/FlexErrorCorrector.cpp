@@ -44,7 +44,7 @@ namespace flex_next_decoder {
     }
 
     // bch3121_fix_errors
-    bool FlexErrorCorrector::fixErrors(uint32_t &data, char phase_id) {
+    bool FlexErrorCorrector::fixErrors(uint32_t &data, char phase_id) { // checked
         // Convert 32-bit data word to BCH coefficient array format
         // Extract bits from MSB to LSB (bit 30 down to bit 0)
         std::array<int, 31> received;
@@ -110,10 +110,9 @@ namespace flex_next_decoder {
         }
     }
 
-    uint32_t
-    FlexErrorCorrector::countBits(uint32_t data) const { // checked
-                                                         // Efficient bit counting using Brian Kernighan's algorithm
-                                                         // variation or compiler builtin if available
+    uint32_t FlexErrorCorrector::countBits(uint32_t data) const { // checked
+        // Efficient bit counting using Brian Kernighan's algorithm
+        // variation or compiler builtin if available
 
 #ifdef USE_BUILTIN_POPCOUNT
         return __builtin_popcount(data);

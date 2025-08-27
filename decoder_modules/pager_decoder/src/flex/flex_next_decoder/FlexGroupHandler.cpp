@@ -8,17 +8,12 @@ namespace flex_next_decoder {
     // FlexGroupHandler Implementation
     //=============================================================================
 
-    FlexGroupHandler::FlexGroupHandler() {
-        reset();
-    }
-    FlexGroupHandler::FlexGroupHandler(int verbosity_level)
-        : FlexNextDecoder(verbosity_level) {
-        reset();
-    }
+    FlexGroupHandler::FlexGroupHandler() { reset(); }
+    FlexGroupHandler::FlexGroupHandler(int verbosity_level) : FlexNextDecoder(verbosity_level) { reset(); }
 
 
-    bool FlexGroupHandler::registerCapcodeToGroup(int64_t capcode, uint32_t vector_word,
-                                                  uint32_t current_cycle, uint32_t current_frame) { // checked so so
+    bool FlexGroupHandler::registerCapcodeToGroup(int64_t capcode, uint32_t vector_word, uint32_t current_cycle,
+                                                  uint32_t current_frame) { // checked so so
         // Extract group information from Vector Information Word
         // Original: unsigned int iAssignedFrame = (int)((viw >> 10) & 0x7f);
         // Original: int groupbit = (int)((viw >> 17) & 0x7f);
@@ -26,17 +21,13 @@ namespace flex_next_decoder {
         int group_bit = static_cast<int>((vector_word >> 17) & 0x7F);
 
         // Validate group bit
-        if (group_bit < 0 || group_bit >= GROUP_BITS) {
-            return false;
-        }
+        if (group_bit < 0 || group_bit >= GROUP_BITS) { return false; }
 
         // Add capcode to group
-        GroupCapcodeList& group = groups_[group_bit];
+        GroupCapcodeList &group = groups_[group_bit];
 
         // Check if we're exceeding maximum capcodes per group
-        if (group.capcodes.size() >= MAX_CAPCODES_PER_GROUP) {
-            return false;
-        }
+        if (group.capcodes.size() >= MAX_CAPCODES_PER_GROUP) { return false; }
 
         group.addCapcode(capcode);
         group.target_frame = static_cast<int>(assigned_frame);
@@ -52,9 +43,7 @@ namespace flex_next_decoder {
     }
 
     int FlexGroupHandler::getGroupBit(int64_t capcode) {
-        if (!isGroupCapcode(capcode)) {
-            return -1;
-        }
+        if (!isGroupCapcode(capcode)) { return -1; }
         return static_cast<int>(capcode - GROUP_CAPCODE_MIN);
     }
 
@@ -66,7 +55,7 @@ namespace flex_next_decoder {
             return info; // Invalid
         }
 
-        GroupCapcodeList& group = groups_[group_bit];
+        GroupCapcodeList &group = groups_[group_bit];
 
         // Check if group has pending capcodes
         if (!group.hasPendingCapcodes()) {
@@ -84,18 +73,17 @@ namespace flex_next_decoder {
         return info;
     }
 
-    std::vector<int> FlexGroupHandler::checkAndCleanupMissedGroups(uint32_t current_cycle, uint32_t current_frame) { // checked so so
+    std::vector<int> FlexGroupHandler::checkAndCleanupMissedGroups(uint32_t current_cycle,
+                                                                   uint32_t current_frame) { // checked
         std::vector<int> missed_groups;
 
         // Check each group for missed messages
         // Original logic from decode_fiw() function
         for (int group_bit = 0; group_bit < GROUP_BITS; group_bit++) {
-            GroupCapcodeList& group = groups_[group_bit];
+            GroupCapcodeList &group = groups_[group_bit];
 
             // Only check groups with pending capcodes
-            if (!group.hasPendingCapcodes()) {
-                continue;
-            }
+            if (!group.hasPendingCapcodes()) { continue; }
 
             bool should_expire = shouldExpireGroup(group_bit, current_cycle, current_frame);
 
@@ -109,35 +97,27 @@ namespace flex_next_decoder {
     }
 
     void FlexGroupHandler::reset() {
-        for (auto& group : groups_) {
-            group.clear();
-        }
+        for (auto &group: groups_) { group.clear(); }
     }
 
-    const GroupCapcodeList& FlexGroupHandler::getGroupInfo(int group_bit) const {
+    const GroupCapcodeList &FlexGroupHandler::getGroupInfo(int group_bit) const {
         static const GroupCapcodeList empty_group;
 
-        if (group_bit < 0 || group_bit >= GROUP_BITS) {
-            return empty_group;
-        }
+        if (group_bit < 0 || group_bit >= GROUP_BITS) { return empty_group; }
 
         return groups_[group_bit];
     }
 
     uint32_t FlexGroupHandler::getActiveGroupCount() const {
         uint32_t count = 0;
-        for (const auto& group : groups_) {
-            if (group.hasPendingCapcodes()) {
-                count++;
-            }
+        for (const auto &group: groups_) {
+            if (group.hasPendingCapcodes()) { count++; }
         }
         return count;
     }
 
     bool FlexGroupHandler::hasGroupPending(int group_bit) const {
-        if (group_bit < 0 || group_bit >= GROUP_BITS) {
-            return false;
-        }
+        if (group_bit < 0 || group_bit >= GROUP_BITS) { return false; }
 
         return groups_[group_bit].hasPendingCapcodes();
     }
@@ -146,7 +126,8 @@ namespace flex_next_decoder {
     // Private Methods Implementation
     //=============================================================================
 
-    uint32_t FlexGroupHandler::calculateTargetCycle(uint32_t assigned_frame, uint32_t current_cycle, uint32_t current_frame) const { // checked so so
+    uint32_t FlexGroupHandler::calculateTargetCycle(uint32_t assigned_frame, uint32_t current_cycle,
+                                                    uint32_t current_frame) const { // checked so so
         // Original algorithm from registerCapcodeToGroup
         // if(iAssignedFrame > flex->FIW.frameno)
         // {
@@ -167,39 +148,32 @@ namespace flex_next_decoder {
         if (assigned_frame > current_frame) {
             // Message frame is in this cycle
             return current_cycle;
-        }
-        else {
+        } else {
             // Message frame is in the next cycle
             if (current_cycle == 15) {
                 return 0; // Wrap around to cycle 0
-            }
-            else {
+            } else {
                 return current_cycle + 1;
             }
         }
     }
 
-    bool FlexGroupHandler::shouldExpireGroup(int group_bit, uint32_t current_cycle, uint32_t current_frame) const {
-        const GroupCapcodeList& group = groups_[group_bit];
+    bool FlexGroupHandler::shouldExpireGroup(int group_bit, uint32_t current_cycle,
+                                             uint32_t current_frame) const { // checked
+        const GroupCapcodeList &group = groups_[group_bit];
 
-        if (!group.hasPendingCapcodes()) {
-            return false;
-        }
+        if (!group.hasPendingCapcodes()) { return false; }
 
         // Original logic from decode_fiw() function
         bool should_reset = false;
 
         // Check if its expected in this frame
         if (static_cast<int>(current_cycle) == group.target_cycle) {
-            if (group.target_frame < static_cast<int>(current_frame)) {
-                should_reset = true;
-            }
+            if (group.target_frame < static_cast<int>(current_frame)) { should_reset = true; }
         }
         // Check if we should have sent a group message in the previous cycle
         else if (current_cycle == 0) {
-            if (group.target_cycle == 15) {
-                should_reset = true;
-            }
+            if (group.target_cycle == 15) { should_reset = true; }
         }
         // If we are waiting for the cycle to roll over then don't reset yet
         else if (current_cycle == 15 && group.target_cycle == 0) {
@@ -213,10 +187,8 @@ namespace flex_next_decoder {
         return should_reset;
     }
 
-    void FlexGroupHandler::clearGroup(int group_bit) {
-        if (group_bit >= 0 && group_bit < GROUP_BITS) {
-            groups_[group_bit].clear();
-        }
+    void FlexGroupHandler::clearGroup(int group_bit) { // checked
+        if (group_bit >= 0 && group_bit < GROUP_BITS) { groups_[group_bit].clear(); }
     }
 
 } // namespace flex_next_decoder

@@ -261,7 +261,7 @@ namespace flex_next_decoder {
                     }
 
                     // Update frame processor with sync and FIW information
-                    if (frame_processor_) { frame_processor_->updateSyncInfo(sync_info_, corrected_fiw); }
+                    if (frame_processor_) { frame_processor_->updateSyncInfo(sync_info_, corrected_fiw); } // ???
 
                     // Check for missed group messages
                     std::vector<int> missed_groups = group_handler_->checkAndCleanupMissedGroups(cycle_no, frame_no);
@@ -284,7 +284,7 @@ namespace flex_next_decoder {
                 if (getVerbosityLevel() >= 3) {
                     std::cout << "FLEX_NEXT: Unable to decode FIW, too much data corruption" << std::endl;
                 }
-                state_machine_->changeState(FlexState::Sync1);
+                // state_machine_->changeState(FlexState::Sync1);
             }
         }
     }
