@@ -36,6 +36,7 @@ namespace flex_next_decoder {
     constexpr std::array<char, 17> FLEX_BCD = { '0', '1', '2', '3', '4', '5', '6', '7', '8',
                                                 '9', ' ', 'U', ' ', '-', ']', '[', '\0' };
 
+    // Flex_Modulation
     struct FlexMode {
         uint32_t sync_code;
         uint32_t baud_rate;
@@ -79,12 +80,14 @@ namespace flex_next_decoder {
         uint32_t current_baud = 1600;
     };
 
+    // Flex_Modulation
     struct ModulationState {
         double symbol_rate = 0.0;
         double envelope = 0.0;
         double zero_offset = 0.0;
     };
 
+    // Flex_Phase
     struct PhaseBuffer {
         std::array<uint32_t, PHASE_WORDS> buffer{};
         int idle_count = 0;
@@ -124,6 +127,7 @@ namespace flex_next_decoder {
         constexpr size_t size() const { return PHASE_WORDS; }
     };
 
+    // Flex_Data
     struct PhaseData {
         bool phase_toggle = false;
         uint32_t data_bit_counter = 0;
@@ -142,6 +146,7 @@ namespace flex_next_decoder {
 
     using GroupHandlerArray = std::array<GroupInfo, GROUP_BITS>;
 
+    // Flex_State
     struct StateMachineData {
         uint32_t fiw_count = 0;
         uint32_t sync2_count = 0;
@@ -164,6 +169,7 @@ namespace flex_next_decoder {
         int group_bit = -1;
     };
 
+    // Flex_Sync
     struct SyncInfo {
         uint32_t sync_code = 0;
         uint32_t baud_rate = 0;

@@ -170,11 +170,11 @@ namespace flex_next_decoder {
                 break;
 
             case FlexState::Sync2:
-                handleSync2State(symbol);
+                handleSync2State();
                 break;
 
             case FlexState::Data:
-                handleDataState(symbol);
+                handleDataState(sym_rectified, sync_info_);
                 break;
         }
     }
@@ -184,7 +184,7 @@ namespace flex_next_decoder {
         if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "handleSync1State called" << std::endl;
         }
-        uint32_t sync_code = synchronizer_->processSymbol(symbol); // checked
+        uint32_t sync_code = synchronizer_->processSymbol(symbol); // checked (unrectified version of the symbol)
 
         if (sync_code != 0) {
             // Sync pattern detected - decode transmission mode
@@ -221,7 +221,7 @@ namespace flex_next_decoder {
         state_machine_->setFIWRawData(0);
     }
 
-    void FlexDecoder::handleFIWState(uint8_t symbol, u_char sym_rectified, SyncInfo &sync_info) { // checked so so
+    void FlexDecoder::handleFIWState(uint8_t symbol, u_char sym_rectified, SyncInfo &sync_info) { // checked
         // Process Frame Information Word (from original decode_fiw logic)
         if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "handleFIWState called" << std::endl;
@@ -289,8 +289,9 @@ namespace flex_next_decoder {
         }
     }
 
-    void FlexDecoder::handleSync2State(uint8_t symbol) { // checked
-        // SYNC2 is 25ms of idle bits at current baud rate (from original logic)
+    void FlexDecoder::handleSync2State() {
+        // void FlexDecoder::handleSync2State(uint8_t symbol) { // checked
+        //  SYNC2 is 25ms of idle bits at current baud rate (from original logic)
         if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "handleSync2State called" << std::endl;
         }
@@ -305,22 +306,24 @@ namespace flex_next_decoder {
         uint32_t baud_rate = demodulator_->getBaudRate();
         uint32_t sync2_symbols = baud_rate * SYNC2_DURATION_MS / 1000;
 
-        if (sync2_count_ == sync2_symbols) { // change >= to == as in original code
+        if (sync2_count_ == sync2_symbols) {
             // SYNC2 complete - transition to DATA state
             state_machine_->changeState(FlexState::Data);
             data_count_ = 0;
+            state_machine_->resetDataCount();
             data_collector_->reset(); // Clear phase buffers
 
             if (getVerbosityLevel() >= 3) { std::cout << "FLEX_NEXT: State: DATA" << std::endl; }
         }
     }
 
-    void FlexDecoder::handleDataState(uint8_t symbol) { // checked
+    void FlexDecoder::handleDataState(u_char sym_rectified, SyncInfo &sync_info) { // checked
         // Process data symbols through data collector (from original read_data)
         if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": " << "handleDataState called" << std::endl;
         }
-        bool all_idle = data_collector_->processSymbol(symbol); // original code read_data
+        // original code read_data (rectified version of the precess symbol)
+        bool all_idle = data_collector_->processSymbol(sym_rectified, sync_info);
         data_count_++;
 
         uint32_t baud_rate = demodulator_->getBaudRate();

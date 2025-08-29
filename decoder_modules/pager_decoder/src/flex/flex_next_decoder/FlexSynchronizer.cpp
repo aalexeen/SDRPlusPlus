@@ -8,7 +8,7 @@ namespace flex_next_decoder {
     FlexSynchronizer::FlexSynchronizer(int verbosity_level) :
         FlexNextDecoder(verbosity_level), sync_buffer_(0), last_polarity_(false), symbol_count_(0) {}
 
-    // flex_sync
+    // flex_sync (unrectified version of the symbol)
     uint32_t FlexSynchronizer::processSymbol(uint8_t symbol) { // checked
         if (getVerbosityLevel() >= 5) {
             std::cout << typeid(*this).name() << ": "

@@ -196,13 +196,15 @@ namespace flex_next_decoder {
          * @brief Handle SYNC2 state - second sync header
          * @param symbol Current symbol
          */
-        void handleSync2State(uint8_t symbol);
+        // void handleSync2State(uint8_t symbol);
+        void handleSync2State();
 
         /**
          * @brief Handle DATA state - message data collection
          * @param symbol Current symbol
          */
-        void handleDataState(uint8_t symbol);
+        // void handleDataState(uint8_t symbol);
+        void handleDataState(u_char symbol, SyncInfo &sync_info);
 
         /**
          * @brief Process completed frame data

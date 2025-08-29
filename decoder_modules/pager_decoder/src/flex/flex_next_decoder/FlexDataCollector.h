@@ -14,19 +14,17 @@ namespace flex_next_decoder {
      * @brief Status information about data collection process
      */
     struct DataCollectionStatus {
-        uint32_t bit_counter = 0;     // Total bits collected
-        bool phase_toggle = false;    // Phase interleaving toggle (3200 bps)
-        uint32_t baud_rate = 1600;    // Current baud rate (1600 or 3200)
-        uint32_t fsk_levels = 2;      // Current FSK levels (2 or 4)
+        uint32_t bit_counter = 0; // Total bits collected
+        bool phase_toggle = false; // Phase interleaving toggle (3200 bps)
+        uint32_t baud_rate = 1600; // Current baud rate (1600 or 3200)
+        uint32_t fsk_levels = 2; // Current FSK levels (2 or 4)
         bool all_phases_idle = false; // All active phases have gone idle
 
         /**
          * @brief Check if data collection is complete
          * @return true if all active phases are idle
          */
-        bool isComplete() const {
-            return all_phases_idle;
-        }
+        bool isComplete() const { return all_phases_idle; }
     };
 
     /**
@@ -62,12 +60,12 @@ namespace flex_next_decoder {
         ~FlexDataCollector() = default;
 
         // Delete copy operations (manage unique state)
-        FlexDataCollector(const FlexDataCollector&) = delete;
-        FlexDataCollector& operator=(const FlexDataCollector&) = delete;
+        FlexDataCollector(const FlexDataCollector &) = delete;
+        FlexDataCollector &operator=(const FlexDataCollector &) = delete;
 
         // Allow move operations
-        FlexDataCollector(FlexDataCollector&&) = default;
-        FlexDataCollector& operator=(FlexDataCollector&&) = default;
+        FlexDataCollector(FlexDataCollector &&) = default;
+        FlexDataCollector &operator=(FlexDataCollector &&) = default;
 
         //=========================================================================
         // Data Collection Interface
@@ -82,7 +80,7 @@ namespace flex_next_decoder {
          * distributes bits to appropriate phase buffers, and checks
          * for idle conditions indicating end of data.
          */
-        bool processSymbol(uint8_t symbol);
+        bool processSymbol(u_char symbol, SyncInfo &sync_info);
 
         /**
          * @brief Clear all phase buffers and reset collection state
@@ -104,25 +102,25 @@ namespace flex_next_decoder {
          * @brief Get phase A buffer (always active)
          * @return Reference to phase A buffer
          */
-        const PhaseBuffer& getPhaseA() const { return phase_a_; }
+        const PhaseBuffer &getPhaseA() const { return phase_a_; }
 
         /**
          * @brief Get phase B buffer (active in 4-level modes)
          * @return Reference to phase B buffer
          */
-        const PhaseBuffer& getPhaseB() const { return phase_b_; }
+        const PhaseBuffer &getPhaseB() const { return phase_b_; }
 
         /**
          * @brief Get phase C buffer (active in 3200 bps modes)
          * @return Reference to phase C buffer
          */
-        const PhaseBuffer& getPhaseC() const { return phase_c_; }
+        const PhaseBuffer &getPhaseC() const { return phase_c_; }
 
         /**
          * @brief Get phase D buffer (active in 3200 bps, 4-level mode)
          * @return Reference to phase D buffer
          */
-        const PhaseBuffer& getPhaseD() const { return phase_d_; }
+        const PhaseBuffer &getPhaseD() const { return phase_d_; }
 
         /**
          * @brief Get current collection status
@@ -149,11 +147,11 @@ namespace flex_next_decoder {
 
         /**
          * @brief Convert FSK symbol to phase bits
-         * @param symbol Input symbol (0-3)
+         * @param sym_rectified Input symbol (0-3)
          * @param bit_a Output bit for phase A
          * @param bit_b Output bit for phase B
          */
-        void symbolToBits(uint8_t symbol, bool& bit_a, bool& bit_b) const;
+        void symbolToBits(uint8_t sym_rectified, bool &bit_a, bool &bit_b, SyncInfo &sync_info);
 
         /**
          * @brief Calculate deinterleaving index for current bit counter
@@ -165,8 +163,9 @@ namespace flex_next_decoder {
          * @brief Update phase buffers with new bits
          * @param bit_a Bit for phases A/C
          * @param bit_b Bit for phases B/D
+         * @param buffer_index
          */
-        void updatePhaseBuffers(bool bit_a, bool bit_b);
+        void updatePhaseBuffers(bool bit_a, bool bit_b, uint32_t buffer_index);
 
         /**
          * @brief Check for idle patterns in phase buffers
@@ -191,9 +190,9 @@ namespace flex_next_decoder {
         PhaseBuffer phase_d_; // Phase D buffer (3200 bps, 4-level)
 
         uint32_t data_bit_counter_; // Total bits collected
-        bool phase_toggle_;         // Phase interleaving toggle
-        uint32_t baud_rate_;        // Current baud rate
-        uint32_t fsk_levels_;       // Current FSK levels
+        bool phase_toggle_; // Phase interleaving toggle
+        uint32_t baud_rate_; // Current baud rate
+        uint32_t fsk_levels_; // Current FSK levels
 
         //=========================================================================
         // Constants
