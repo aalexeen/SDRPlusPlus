@@ -97,6 +97,13 @@ namespace flex_next_decoder {
 
     const DecodingOptions &FlexMessageDecoder::getDecodingOptions() const { return options_; }
 
+    void FlexMessageDecoder::setMessageCallback(std::function<void(int64_t, int, const std::string&)> callback) {
+        // Pass callback to output formatter
+        if (output_formatter_) {
+            output_formatter_->setMessageCallback(std::move(callback));
+        }
+    }
+
     bool FlexMessageDecoder::processFragment(MessageParseResult &result) {
         if (result.fragment_flag == FragmentFlag::Complete || result.fragment_flag == FragmentFlag::Unknown) {
             return false; // No fragment processing needed

@@ -4,6 +4,7 @@
 #include "FlexTypes.h"
 #include <string>
 #include <vector>
+#include <functional>
 
 namespace flex_next_decoder {
 
@@ -14,6 +15,9 @@ namespace flex_next_decoder {
         FlexOutputFormatter();
         FlexOutputFormatter(int verbosity_level);
         ~FlexOutputFormatter() override = default;
+
+        // New: Set callback for GUI messages
+        void setMessageCallback(std::function<void(int64_t, int, const std::string&)> callback);
 
         void outputMessage(const ParsedMessage& message,
                            const MessageInfo& msg_info,
@@ -30,6 +34,9 @@ namespace flex_next_decoder {
                                  char fragment_flag) const;
 
         std::string getMessageTypeString(MessageType type) const;
+        
+        // New: Message callback for GUI integration
+        std::function<void(int64_t, int, const std::string&)> message_callback_;
     };
 
 } // namespace flex_next_decoder

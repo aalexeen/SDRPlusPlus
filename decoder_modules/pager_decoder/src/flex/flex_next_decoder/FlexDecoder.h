@@ -3,7 +3,8 @@
 #include "FlexNextDecoder.h"
 #include "FlexTypes.h"
 #include <memory>
-#include <cstdint>
+#include <functional>
+
 
 namespace flex_next_decoder {
 
@@ -126,6 +127,12 @@ namespace flex_next_decoder {
          * Propagates verbosity setting to all subsystems that support it.
          */
         void setVerbosityLevel(int level);
+
+        /**
+         * @brief Set callback for message handling
+         * @param callback Callback function to handle decoded messages
+         */
+        void setMessageCallback(std::function<void(int64_t, int, const std::string &)> callback);
 
         /**
          * @brief Get current decoder state

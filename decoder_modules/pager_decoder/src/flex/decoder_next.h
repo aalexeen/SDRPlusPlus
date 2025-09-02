@@ -87,7 +87,7 @@ public:
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Debug output level:\n0 = Silent\n1 = Errors only\n2 = Info + Errors\n3 = Debug info\n4 "
-                "= Verbose debug\n5 = Very verbose");
+                              "= Verbose debug\n5 = Very verbose");
         }
 
         if (ImGui::Button("Reset Decoder")) { resetDecoder(); }
@@ -139,6 +139,9 @@ public:
     }
 
 private:
+    std::vector<std::string> flexMessages;
+
+    // Update showFlexMessageWindow
     void showFlexMessageWindow() {
         // Use window flags to prevent interaction with other windows
         ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoFocusOnAppearing;
@@ -155,13 +158,8 @@ private:
             ImGui::End();
             return;
         }
-        // Get messages from the FLEX decoder using the existing global functions
-        // auto messages = getFlexMessages();
-
         // Controls
-        /*if (ImGui::Button("Clear Messages")) {
-            clearFlexMessages();
-        }*/
+        if (ImGui::Button("Clear Messages")) { flexMessages.clear(); }
         ImGui::SameLine();
         ImGui::Checkbox("Auto Scroll", &autoScrollMessages);
         ImGui::Separator();
@@ -169,14 +167,10 @@ private:
         // Message display area
         ImGui::BeginChild("MessageArea", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
 
-        /*for (const auto& message : messages) {
-            ImGui::TextUnformatted(message.c_str());
-        }
+        for (const auto &message: flexMessages) { ImGui::TextUnformatted(message.c_str()); }
 
         // Auto-scroll to bottom if enabled and there are new messages
-        if (autoScrollMessages && !messages.empty()) {
-            ImGui::SetScrollHereY(1.0f);
-        }*/
+        if (autoScrollMessages && !flexMessages.empty()) { ImGui::SetScrollHereY(1.0f); }
 
         ImGui::EndChild();
         ImGui::End();
@@ -237,7 +231,8 @@ private:
     }
 
     void processFlexSample(float sample) {
-        if (!initialized || !flexDecoderNext) { return; }
+        // if (!initialized || !flexDecoderNext) { return; }
+        if (!flexDecoderNext) { return; }
 
         try {
             flexDecoderNext->processSample(sample);
@@ -253,21 +248,23 @@ private:
     void initFLEXDecoder() {
         try {
             // Initialize BCH error correction
-            static const int primitive_poly[] = {1, 0, 1, 0, 0, 1}; // Example for BCH(31,21,5)
+            static const int primitive_poly[] = { 1, 0, 1, 0, 0, 1 }; // Example for BCH(31,21,5)
             bchDecoder = std::make_unique<BCHCode>(primitive_poly, 5, 31, 21, 2);
 
             // Initialize FLEX decoder next
             flexDecoderNext = std::make_unique<flex_next_decoder::FlexDecoder>(
-                static_cast<uint32_t>(PAGER_AUDIO_SAMPLERATE), verbosity_level_);
-            /*flexDecoderNext->setMessageCallback([this](int64_t addr, int type, const std::string& data) {
+                    static_cast<uint32_t>(PAGER_AUDIO_SAMPLERATE), verbosity_level_);
+
+            // Register callback to route messages to handleFlexMessage
+            flexDecoderNext->setMessageCallback([this](int64_t addr, int type, const std::string& data) {
                 handleFlexMessage(addr, type, data);
-            });*/
+            });
+
             // Configure decoder settings
             if (!flexDecoderNext) {
                 std::cout << "Failed to create FlexDecoder instance" << std::endl;
                 return;
             }
-
 
             flexDecoderNext->setVerbosityLevel(2); // Set debug level
 
@@ -312,6 +309,9 @@ private:
                 return;
             }
 
+            // Store for GUI display (use the full formatted data directly)
+            flexMessages.push_back(data);
+
             // Console output for testing
             printf("FLEX: Addr=%ld Type=%d Data=%s\n", address, type, data.c_str());
 
@@ -320,9 +320,8 @@ private:
         } catch (const std::exception &e) { flog::error("Error handling FLEX message: {}", e.what()); }
     }
 
-
     void resetDecoder() {
-        if (!initialized) return;
+        // if (!initialized) return;
 
         try {
             if (flexDecoderNext) {

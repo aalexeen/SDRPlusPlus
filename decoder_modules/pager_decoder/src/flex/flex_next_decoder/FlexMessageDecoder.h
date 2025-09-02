@@ -196,6 +196,8 @@ namespace flex_next_decoder {
          */
         const DecodingOptions &getDecodingOptions() const;
 
+        void setMessageCallback(std::function<void(int64_t, int, const std::string &)> callback);
+
         //=========================================================================
         // Fragment Assembly
         //=========================================================================

@@ -387,6 +387,12 @@ namespace flex_next_decoder {
         // (Individual subsystems can check getVerbosityLevel() via getter if needed)
     }
 
+    void FlexDecoder::setMessageCallback(std::function<void(int64_t, int, const std::string &)> callback) {
+        // Set callback in message decoder, which will pass it to output formatter
+        if (message_decoder_) { message_decoder_->setMessageCallback(std::move(callback)); }
+    }
+
+
     FlexState FlexDecoder::getCurrentState() const {
         return state_machine_ ? state_machine_->getCurrentState() : FlexState::Sync1;
     }
