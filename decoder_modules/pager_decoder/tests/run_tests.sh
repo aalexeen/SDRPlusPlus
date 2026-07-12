@@ -90,6 +90,25 @@ check_nodrop() {
     fi
 }
 
+# check_xfail_bleed <name> <fixture>: KNOWN-FAILING regression for the FRAG
+# content-bleed bug. The fixture is a real off-air 3200/4FSK capture whose
+# fragmented pages leak raw signature/binary words (an 8-hex-digit run) into
+# ALN content — multimon-ng decodes the SAME samples with zero bleed. Until the
+# FRAG fix lands this is expected to bleed, so it reports XFAIL (does NOT fail
+# the suite). When the fix stops the leak it becomes XPASS -> flip this to a
+# hard `check` asserting no hex-run in the ALN content.
+check_xfail_bleed() {
+    local name="$1" fixture="$2"
+    local bleed
+    bleed="$("$BUILD/cpp_harness" "$HERE/golden/$fixture" 2>/dev/null \
+             | grep '|ALN|' | grep -cE '[0-9A-F]{8} [0-9A-F]{8}')"
+    if [ "$bleed" -eq 0 ]; then
+        echo "XPASS $name  (bleed gone — promote this to a hard check!)"; pass=$((pass+1))
+    else
+        echo "XFAIL $name  (known FRAG content-bleed: $bleed ALN line(s) with hex leak)"
+    fi
+}
+
 echo "== running golden fixtures =="
 # ALN: capcode 1234567, payload "HELLO FLEX 1234567890".
 # NOTE: frag field "0.0.C" is CURRENT behaviour; multimon-ng emits "3.0.K"
@@ -128,6 +147,13 @@ check_drop "vec-corrupt-diag"  aln_vec_corrupt_1600.s16  "DROP drop|A|vidx=2|bad
 # A clean signal must produce ZERO drop diagnostics (idle skips are not logged).
 check_nodrop "aln-clean-nodrop"     aln_1600.s16
 check_nodrop "numeric-clean-nodrop" numeric_1600.s16
+# FRAG content-bleed: real off-air 3200/4 capture (capcode 6259133, an F+C
+# fragment pair). Our decoder leaks ~32 raw signature/binary words as hex into
+# the ALN text + duplicates the header ("NFrom: rths@careawame:"); multimon-ng
+# reassembles the same samples cleanly. KNOWN-FAILING until the FRAG fix.
+# Capture window [74s,90s] of a 127s live capture; needs history from ~76s for
+# the bleed to reproduce (it is stateful — a shorter window loses it).
+check_xfail_bleed "frag-bleed-3200" frag_bleed_3200.s16
 
 # PHASE-01: differential test of the capcode long-address formula (no audio —
 # pure arithmetic swept across the address classification space).
