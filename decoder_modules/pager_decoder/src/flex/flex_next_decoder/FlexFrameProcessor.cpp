@@ -86,10 +86,16 @@ namespace flex_next_decoder {
         // Copy phase data for error correction
         std::vector<uint32_t> phase_data(phase_buffer.data(), phase_buffer.data() + phase_buffer.size());
 
-        // Apply BCH error correction
-        if (error_correction_enabled_ && !applyErrorCorrection(phase_data, phase_name)) {
-            // If error correction fails, we can't process this phase
-            return messages;
+        // Per-word BCH status, parallel to phase_data (reference bch_err[]):
+        // 1 = uncorrectable, 0 = ok. Threaded into parsers so corrupt words
+        // become '?' instead of decoded garbage (DROP-01).
+        std::vector<uint8_t> word_error(phase_data.size(), 0);
+
+        // Apply BCH error correction. Unlike the old code, this never abandons
+        // the phase on too many failures (the reference C keeps going and marks
+        // uncorrectable words); it records per-word status into word_error.
+        if (error_correction_enabled_) {
+            applyErrorCorrection(phase_data, word_error, phase_name);
         }
 
         // Extract Block Information Word
@@ -101,6 +107,15 @@ namespace flex_next_decoder {
         // Process all address/vector word pairs
         for (uint32_t i = biw.address_offset; i < biw.vector_offset; i++) {
             try {
+                // Skip address words that failed BCH correction (reference
+                // demod_flex_next.c:3311). Gating on word_error BEFORE the idle
+                // check is what makes it safe to no longer overwrite corrupt
+                // words with the 0x1FFFFF idle sentinel: a genuinely uncorrectable
+                // address word is dropped here, not misread as idle.
+                if (i < word_error.size() && word_error[i]) {
+                    continue; // Address word uncorrectable, skip page
+                }
+
                 // Check for idle codewords
                 if (phase_data[i] == 0 || (phase_data[i] & MESSAGE_BITS_MASK) == MESSAGE_BITS_MASK) {
                     continue; // Skip idle words
@@ -114,10 +129,30 @@ namespace flex_next_decoder {
                     continue; // Invalid address
                 }
 
+                // Long address consumes a 2nd word. Reference demod_flex_next.c
+                // :3371-3380 skips the page if that word is out of range or failed
+                // BCH correction (its value drives the capcode, so a bad one gives
+                // a wrong recipient). Skip the consumed word either way.
+                if (aiw.long_address) {
+                    if (i + 1 >= biw.vector_offset ||
+                        (i + 1 < word_error.size() && word_error[i + 1])) {
+                        i++; // consume the (bad/missing) 2nd word
+                        continue;
+                    }
+                }
+
                 // Calculate vector word index
                 uint32_t vector_index = biw.vector_offset + i - biw.address_offset;
                 if (vector_index >= phase_data.size()) {
                     continue; // Vector index out of bounds
+                }
+
+                // Skip the page if the vector word itself failed BCH correction
+                // (reference demod_flex_next.c:3504). A corrupt vector word means
+                // the message boundaries/type are unknown, so parsers can't run;
+                // done centrally here rather than duplicated in each parser.
+                if (vector_index < word_error.size() && word_error[vector_index]) {
+                    continue; // Vector word uncorrectable, skip page
                 }
 
                 // Get header word index for fragment information
@@ -160,8 +195,9 @@ namespace flex_next_decoder {
                     continue; // Short Instructions don't need message parsing
                 }
 
-                // Parse message content
-                MessageParseResult parse_result = parseMessageContent(aiw, viw, phase_data, cycle_number, frame_number);
+                // Parse message content. Pass the real vector word index (C `j`)
+                // — Numeric/Tone parsers re-read the raw vector through it.
+                MessageParseResult parse_result = parseMessageContent(aiw, viw, phase_data, word_error, vector_index, cycle_number, frame_number);
 
                 // Create processed message
                 ProcessedMessage message;
@@ -197,7 +233,10 @@ namespace flex_next_decoder {
     // Private Methods Implementation
     //=============================================================================
 
-    bool FlexFrameProcessor::applyErrorCorrection(std::vector<uint32_t> &phase_data, char phase_name) {
+    bool FlexFrameProcessor::applyErrorCorrection(std::vector<uint32_t> &phase_data,
+                                                  std::vector<uint8_t> &word_error, char phase_name) {
+        word_error.assign(phase_data.size(), 0);
+
         if (!error_corrector_) {
             return true; // No error corrector available, assume data is clean
         }
@@ -211,9 +250,13 @@ namespace flex_next_decoder {
             bool corrected = error_corrector_->fixErrors(phase_data[i], phase_name);
 
             if (!corrected) {
+                // Reference (demod_flex_next.c) never overwrites an uncorrectable
+                // word with an idle sentinel; it records bch_err[i]=1 and leaves
+                // the (masked) received value in place. Parsers turn the flag into
+                // '?'. Writing 0x1FFFFF here was the DROP-01 bug — it aliased the
+                // idle pattern and made corrupt words silently vanish.
+                word_error[i] = 1;
                 failed_words++;
-                // Instead of abandoning, mark as idle and continue
-                phase_data[i] = 0x1FFFFF; // Idle pattern (all 1s in 21-bit field)
             } else if (phase_data[i] != (original_word & 0x1FFFFF)) {
                 corrected_words++;
             } else {
@@ -230,15 +273,10 @@ namespace flex_next_decoder {
                       << " Total:" << phase_data.size() << std::endl;
         }
 
-        // Be much more lenient - allow processing if at least 50% of words are usable
-        // In real FLEX systems, some corruption is normal
-        bool success = (failed_words <= (int) phase_data.size() / 2);
-
-        if (!success && verbosity_level_ >= 3) {
-            std::cout << "FLEX_NEXT: Phase " << phase_name << " abandoned - too many uncorrectable words ("
-                      << failed_words << "/" << phase_data.size() << ")" << std::endl;
-        }
-        return success;
+        // Never abandon the phase: the reference always parses what it can and
+        // marks the rest with '?'. The old 50%-usable threshold was invented and
+        // dropped whole phases the reference would have decoded (DROP-01b).
+        return true;
     }
 
     BlockInfoWord FlexFrameProcessor::extractBlockInfoWord(const std::vector<uint32_t> &phase_data, char phase_name) {
@@ -284,20 +322,51 @@ namespace flex_next_decoder {
         AddressInfoWord aiw;
         aiw.raw_data = raw_aiw;
 
-        // Determine if this is a long address using original algorithm
-        aiw.long_address = (raw_aiw < LONG_ADDRESS_THRESHOLD_1) ||
-                           (raw_aiw > LONG_ADDRESS_THRESHOLD_2_LOW && raw_aiw < LONG_ADDRESS_THRESHOLD_2_HIGH) ||
-                           (raw_aiw > LONG_ADDRESS_THRESHOLD_3);
+        // Capcode decode per ARIB STD-43A Table 3.8.1-1 / 3.8.2.2-1, ported
+        // verbatim from reference demod_flex_next.c:3359-3410. The old code used
+        // the pre-_next demod_flex.c PDW formula (single formula + 3 thresholds),
+        // which produced wrong capcodes for long addresses (PHASE-01).
+        //
+        // Address word classification (raw 21-bit values):
+        //   LA1: 0x000001-0x008000 (first word of long-addr sets 1-2/1-3/1-4)
+        //   SA : 0x008001-0x1E0000 (short address, capcode = aw - 0x8000)
+        //   LA2: 0x1F7FFF-0x1FFFFE (first word of long-addr sets 2-3/2-4)
+        // Only LA1 and LA2 begin a long address.
+        aiw.long_address = (raw_aiw >= 0x000001u && raw_aiw <= 0x008000u) ||   // LA1
+                           (raw_aiw >= 0x1F7FFFu && raw_aiw <= 0x1FFFFEu);     // LA2
 
-        // Calculate capcode using original algorithm
+        // Short-address default (also correct for all special-address ranges).
+        aiw.capcode = static_cast<int64_t>(raw_aiw) - 0x8000;
+
         if (aiw.long_address) {
-            // Long address calculation (credit to PDW)
-            aiw.capcode = next_word ^ MESSAGE_BITS_MASK;
-            aiw.capcode = aiw.capcode << 15;
-            aiw.capcode += LONG_ADDRESS_CONSTANT + raw_aiw;
-        } else {
-            // Short address calculation
-            aiw.capcode = raw_aiw - AIW_SHORT_ADDRESS_OFFSET;
+            // Long address uses two words: w1 = this word, w2 = next word.
+            // The set is chosen by which ranges w1 and w2 fall into.
+            uint32_t w1 = raw_aiw;
+            uint32_t w2 = next_word;
+            aiw.capcode = 0;
+
+            if (w1 >= 1 && w1 <= 32768 &&
+                w2 >= 2064383u && w2 <= 2097150u) {
+                // Set 1-2: w1 in LA1, w2 in LA2
+                aiw.capcode = static_cast<int64_t>(w1)
+                              + static_cast<int64_t>(2097151u - w2) * 32768LL
+                              + 2068480LL;
+            } else if (w1 >= 1 && w1 <= 32768 &&
+                       w2 >= 1966081u && w2 <= 2031616u) {
+                // Set 1-3 / 1-4: w1 in LA1, w2 in LA3/LA4
+                aiw.capcode = static_cast<int64_t>(w1)
+                              + static_cast<int64_t>(w2 - 1933312u) * 32768LL
+                              + 2068480LL;
+            } else if (w1 >= 2064383u && w1 <= 2097150u &&
+                       w2 >= 1966081u && w2 <= 2031616u) {
+                // Set 2-3 / 2-4: w1 in LA2, w2 in LA3/LA4
+                aiw.capcode = static_cast<int64_t>(w1 - 2064383u)
+                              + static_cast<int64_t>(w2 - 1867776u) * 32768LL
+                              + 2068479LL;
+            } else {
+                // Unknown long-address set — invalid, leave capcode invalid.
+                return aiw;
+            }
         }
 
         // Validate capcode range
@@ -360,9 +429,24 @@ namespace flex_next_decoder {
             viw.continuation_flag = (header_word >> 10) & 0x1;
         }
 
-        // Validate message bounds
-        if (viw.message_length > 0 && viw.message_word_start + viw.message_length <= PHASE_WORDS) {
-            viw.is_valid = true;
+        // Validate message bounds. The message_length field is only meaningful
+        // for Alphanumeric/Secure/Binary — those parsers consume it. Numeric
+        // types recompute their own word range from the vector word and ignore
+        // message_length (reference demod_flex_next.c changelog: "length is only
+        // checked for Alpha messages, the other types calculate their length
+        // while decoding"). Gating numeric on message_length>0 wrongly rejected
+        // short numeric pages whose n field decremented to 0 (SHORT-NUM-01).
+        switch (viw.message_type) {
+            case MessageType::StandardNumeric:
+            case MessageType::SpecialNumeric:
+            case MessageType::NumberedNumeric:
+                // Length computed by the parser; only bound the start word.
+                viw.is_valid = (viw.message_word_start < PHASE_WORDS);
+                break;
+            default:
+                viw.is_valid = (viw.message_length > 0 &&
+                                viw.message_word_start + viw.message_length <= PHASE_WORDS);
+                break;
         }
 
         // Special case for tone messages
@@ -389,6 +473,8 @@ namespace flex_next_decoder {
     MessageParseResult FlexFrameProcessor::parseMessageContent(const AddressInfoWord &address_info,
                                                                const VectorInfoWord &vector_info,
                                                                const std::vector<uint32_t> &phase_data,
+                                                               const std::vector<uint8_t> &word_error,
+                                                               uint32_t vector_index,
                                                                uint32_t cycle_number, uint32_t frame_number) {
         if (!message_decoder_) {
             MessageParseResult result;
@@ -404,9 +490,10 @@ namespace flex_next_decoder {
         input.capcode = address_info.capcode;
         input.phase_data = phase_data.data();
         input.phase_data_size = static_cast<uint32_t>(phase_data.size());
+        input.word_error = word_error.empty() ? nullptr : word_error.data();
         input.message_word_start = vector_info.message_word_start;
         input.message_length = vector_info.message_length;
-        input.vector_word_index = 0; // Will be set by caller if needed
+        input.vector_word_index = vector_index; // C `j`: Numeric/Tone re-read the raw vector word here
         input.fragment_number = vector_info.fragment_number;
         input.continuation_flag = vector_info.continuation_flag;
         input.is_group_message = address_info.is_group_message;

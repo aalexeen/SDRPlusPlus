@@ -126,9 +126,14 @@ namespace flex_next_decoder {
             std::cout << typeid(*this).name() << ": " << "processSingleSample called" << std::endl;
         }
 
-        // The baud rate of first syncword and FIW is always 1600, so set that
-        // rate to start.
-        demodulator_->setBaudRate(1600);
+        // NOTE (SYNC-01 fix): do NOT reset the baud rate here. This runs on every
+        // sample, so an unconditional setBaudRate(1600) clobbered the 3200 rate that
+        // is programmed at the FIW->Sync2 transition (l.278 below) on the very next
+        // sample, leaving buildSymbol permanently at 1600-baud timing and breaking the
+        // 3200-baud modes (A2/A4/A7). The 1600 default is correctly re-established
+        // after each frame (l.~338 setBaudRate(1600) post-processCompletedFrame) and
+        // on loss of lock (FlexDemodulator.cpp:62), mirroring the C reference where
+        // Demodulator.baud has no per-sample reset.
 
         // Step 1: Signal processing and symbol recovery
         if (demodulator_->buildSymbol(sample)) {

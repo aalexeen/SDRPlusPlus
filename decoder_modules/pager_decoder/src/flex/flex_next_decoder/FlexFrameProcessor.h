@@ -235,7 +235,12 @@ namespace flex_next_decoder {
          * @param phase_name Phase identifier for logging
          * @return true if error correction succeeded
          */
-        bool applyErrorCorrection(std::vector<uint32_t> &phase_data, char phase_name);
+        // Corrects phase_data in place and records per-word BCH status into
+        // word_error (1 = uncorrectable, 0 = ok), parallel to phase_data.
+        // Always returns true (the reference never abandons a phase); the bool
+        // is kept for call-site compatibility.
+        bool applyErrorCorrection(std::vector<uint32_t> &phase_data,
+                                  std::vector<uint8_t> &word_error, char phase_name);
 
         /**
          * @brief Extract and validate Block Information Word
@@ -279,13 +284,16 @@ namespace flex_next_decoder {
          * @param address_info Address information
          * @param vector_info Vector information
          * @param phase_data Phase buffer data
+         * @param vector_index Index of the vector word in phase_data (C `j`) —
+         *        Numeric/Tone parsers re-read the raw vector via this index
          * @param cycle_number Current cycle
          * @param frame_number Current frame
          * @return Message parsing result
          */
         MessageParseResult parseMessageContent(const AddressInfoWord &address_info, const VectorInfoWord &vector_info,
-                                               const std::vector<uint32_t> &phase_data, uint32_t cycle_number,
-                                               uint32_t frame_number);
+                                               const std::vector<uint32_t> &phase_data,
+                                               const std::vector<uint8_t> &word_error, uint32_t vector_index,
+                                               uint32_t cycle_number, uint32_t frame_number);
 
         //=========================================================================
         // Utility Methods

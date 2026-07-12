@@ -9,6 +9,7 @@
 #include <memory>
 #include "dsp.h" // Local FLEX DSP header
 #include <thread>
+#include <mutex>
 #include <chrono>
 #include "../BCHCode.h" // BCH error correction (up one directory)
 #include "flex_next_decoder/FlexDecoder.h"
@@ -140,6 +141,10 @@ public:
 
 private:
     std::vector<std::string> flexMessages;
+    // Guards flexMessages: written from the DSP thread (handleFlexMessage) and
+    // read/cleared from the GUI thread (showMessageWindow). Without this, a
+    // push_back reallocation concurrent with GUI iteration is a use-after-free.
+    std::mutex flexMessagesMutex;
 
     // Update showFlexMessageWindow
     void showFlexMessageWindow() {
@@ -159,18 +164,29 @@ private:
             return;
         }
         // Controls
-        if (ImGui::Button("Clear Messages")) { flexMessages.clear(); }
+        if (ImGui::Button("Clear Messages")) {
+            std::lock_guard<std::mutex> lck(flexMessagesMutex);
+            flexMessages.clear();
+        }
         ImGui::SameLine();
         ImGui::Checkbox("Auto Scroll", &autoScrollMessages);
         ImGui::Separator();
 
+        // Snapshot under lock so the DSP thread can keep appending while we
+        // render, without holding the mutex across ImGui calls.
+        std::vector<std::string> messagesSnapshot;
+        {
+            std::lock_guard<std::mutex> lck(flexMessagesMutex);
+            messagesSnapshot = flexMessages;
+        }
+
         // Message display area
         ImGui::BeginChild("MessageArea", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
 
-        for (const auto &message: flexMessages) { ImGui::TextUnformatted(message.c_str()); }
+        for (const auto &message: messagesSnapshot) { ImGui::TextUnformatted(message.c_str()); }
 
         // Auto-scroll to bottom if enabled and there are new messages
-        if (autoScrollMessages && !flexMessages.empty()) { ImGui::SetScrollHereY(1.0f); }
+        if (autoScrollMessages && !messagesSnapshot.empty()) { ImGui::SetScrollHereY(1.0f); }
 
         ImGui::EndChild();
         ImGui::End();
@@ -310,7 +326,10 @@ private:
             }
 
             // Store for GUI display (use the full formatted data directly)
-            flexMessages.push_back(data);
+            {
+                std::lock_guard<std::mutex> lck(flexMessagesMutex);
+                flexMessages.push_back(data);
+            }
 
             // Console output for testing
             printf("FLEX: Addr=%ld Type=%d Data=%s\n", address, type, data.c_str());

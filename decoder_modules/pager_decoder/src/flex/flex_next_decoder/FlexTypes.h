@@ -33,8 +33,10 @@ namespace flex_next_decoder {
     constexpr int64_t GROUP_CAPCODE_MAX = 2029583;
     constexpr int64_t MAX_CAPCODE = 4297068542LL;
 
+    // ARIB STD-43A BCD table (matches C flex_bcd "0123456789.U -][").
+    // Index 10 = '.' (spare), not ' ' — was PARSE-03 bug.
     constexpr std::array<char, 17> FLEX_BCD = { '0', '1', '2', '3', '4', '5', '6', '7', '8',
-                                                '9', ' ', 'U', ' ', '-', ']', '[', '\0' };
+                                                '9', '.', 'U', ' ', '-', ']', '[', '\0' };
 
     // Flex_Modulation
     struct FlexMode {

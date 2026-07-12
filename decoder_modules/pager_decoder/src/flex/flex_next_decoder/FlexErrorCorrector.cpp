@@ -43,8 +43,16 @@ namespace flex_next_decoder {
         }
     }
 
-    // bch3121_fix_errors
+    // bch3121_fix_errors — mirrors reference bch_flex_next_correct (bch.c:511-546).
+    // The 32-bit FLEX word is: bits 0-20 info, 21-30 BCH parity, bit 31 = even
+    // parity over bits 0-30. BCHCode.decode only touches the 31-bit codeword;
+    // this function adds the even-parity gate that rejects BCH MISCORRECTIONS
+    // (3+ errors that BCH "fixes" into a valid-looking-but-wrong word).
     bool FlexErrorCorrector::fixErrors(uint32_t &data, char phase_id) { // checked
+        // Preserve the received even-parity bit (bit 31) — it is NOT part of the
+        // 31-bit BCH codeword but IS needed for the post-correction parity gate.
+        const uint32_t received_parity_bit = data & 0x80000000u;
+
         // Convert 32-bit data word to BCH coefficient array format
         // Extract bits from MSB to LSB (bit 30 down to bit 0)
         std::array<int, 31> received;
@@ -55,7 +63,7 @@ namespace flex_next_decoder {
             std::cout << "DEBUG: Input data=0x" << std::hex << data << std::dec << std::endl;
         }
 
-        /*Convert the data pattern into an array of coefficients*/
+        /*Convert the data pattern into an array of coefficients (bits 30..0)*/
         for (int i = 0; i < 31; i++) {
             received[i] = (temp_data >> 30) & 1; // Extract MSB
             temp_data <<= 1; // Shift left for next bit
@@ -77,15 +85,34 @@ namespace flex_next_decoder {
 
         if (decode_result == 0) {
             // Success: Convert corrected coefficients back to 32-bit format
+            // (this holds bits 30..0; bit 31 is carried separately).
             uint32_t corrected_data = 0;
             for (int i = 0; i < 31; i++) {
                 corrected_data <<= 1;
                 corrected_data |= received[i];
             }
 
-            // Count how many errors were fixed
+            // Count how many errors were fixed (bits 0-30 only).
             uint32_t error_mask = (data & 0x7FFFFFFF) ^ corrected_data;
             uint32_t errors_fixed = countBits(error_mask);
+
+            // Even-parity gate — applies ONLY when BCH actually changed bits
+            // 0-30 (mirrors bch.c: the clean-syndrome path 519-529 NEVER
+            // rejects, even if bit 31 alone is flipped; the parity check
+            // 537-543 guards only the CORRECTED path).
+            //
+            // When a correction was applied, reassemble it with the RECEIVED
+            // parity bit and reject if the 32-bit popcount is odd: an odd total
+            // error count means 3+ real errors and the BCH "fix" is a
+            // miscorrection (valid-looking but wrong). bch.c:542.
+            if (errors_fixed > 0 && (countBits(received_parity_bit | corrected_data) & 1u)) {
+                if (data != 0 && verbosity_level_ >= 3) {
+                    std::cout << "FLEX_NEXT: Phase " << phase_id
+                              << " BCH miscorrection rejected (odd parity, 3+ errors) 0x"
+                              << std::hex << data << std::dec << std::endl;
+                }
+                return false;
+            }
 
             if (errors_fixed > 0) {
                 if (verbosity_level_ >= 3) {

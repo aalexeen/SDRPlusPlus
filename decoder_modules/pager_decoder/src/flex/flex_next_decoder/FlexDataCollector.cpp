@@ -23,12 +23,19 @@ namespace flex_next_decoder {
 
     // read_data - rectified version of the process symbol
     bool FlexDataCollector::processSymbol(u_char sym_rectified, SyncInfo &sync_info) { // checked
+        // DATA-01 fix: refresh the transmission mode from the sync info every symbol,
+        // exactly as read_data() reads flex->Sync.baud / flex->Sync.levels. Previously
+        // baud_rate_ was left pinned at BAUD_1600 (this assignment was commented out)
+        // while fsk_levels_ WAS refreshed in symbolToBits(), so every 3200-baud mode
+        // (A2/A4) ran the 1600-baud, no-interleave path and never populated Phase C/D.
+        // baud_rate here is the SYMBOL rate (A3=1600, A2/A4=3200), matching C's table.
+        baud_rate_ = sync_info.baud_rate;
+
         // Convert symbol to phase bits according to FSK encoding
         bool bit_a, bit_b;
         symbolToBits(sym_rectified, bit_a, bit_b, sync_info);
 
         // Handle phase toggle for different baud rates
-        // baud_rate_ = sync_info.baud_rate;
         if (baud_rate_ == BAUD_1600) {
             phase_toggle_ = false; // No interleaving at 1600 bps
         }
