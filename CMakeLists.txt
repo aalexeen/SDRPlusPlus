@@ -58,6 +58,9 @@ option(OPT_BUILD_RYFI_DECODER "RyFi data link decoder" OFF)
 option(OPT_BUILD_VOR_RECEIVER "VOR beacon receiver" OFF)
 option(OPT_BUILD_WEATHER_SAT_DECODER "Build the HRPT decoder module (no dependencies required)" OFF)
 
+# BCH Error Correction Options (for FLEX/Pager decoder)
+option(OPT_USE_FULL_BCH "Use full BCH error correction for FLEX (license restricted)" ON)
+
 # Misc
 option(OPT_BUILD_DISCORD_PRESENCE "Build the Discord Rich Presence module" ON)
 option(OPT_BUILD_FREQUENCY_MANAGER "Build the Frequency Manager module" ON)
@@ -72,6 +75,23 @@ option(OPT_BUILD_SCHEDULER "Build the scheduler" OFF)
 option(USE_INTERNAL_LIBCORRECT "Use an internal version of libcorrect" ON)
 option(USE_BUNDLE_DEFAULTS "Set the default resource and module directories to the right ones for a MacOS .app" OFF)
 option(COPY_MSVC_REDISTRIBUTABLES "Copy over the Visual C++ Redistributable" OFF)
+
+# BCH Implementation Configuration (for the FLEX pager decoder)
+if(OPT_BUILD_PAGER_DECODER)
+    if(OPT_USE_FULL_BCH)
+        message(STATUS "FLEX decoder: Using full BCH error correction (license restricted for commercial use)")
+        set(FLEX_BCH_SOURCE "BCHCode.cpp")
+        set(FLEX_USE_FULL_BCH 1)
+    else()
+        message(STATUS "FLEX decoder: Using BCH stub (GPL-compatible, no error correction)")
+        set(FLEX_BCH_SOURCE "BCHCode_stub.cpp")
+        set(FLEX_USE_FULL_BCH 0)
+    endif()
+
+    # Make BCH configuration available to subdirectories
+    set(FLEX_BCH_SOURCE ${FLEX_BCH_SOURCE} CACHE INTERNAL "BCH source file for FLEX decoder")
+    set(FLEX_USE_FULL_BCH ${FLEX_USE_FULL_BCH} CACHE INTERNAL "Whether to use full BCH implementation")
+endif()
 
 # Module cmake path
 set(SDRPP_MODULE_CMAKE "${CMAKE_SOURCE_DIR}/sdrpp_module.cmake")

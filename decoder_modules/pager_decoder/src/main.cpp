@@ -9,7 +9,7 @@
 #include <utils/optionlist.h>
 #include "decoder.h"
 #include "pocsag/decoder.h"
-#include "flex/decoder.h"
+#include "flex/decoder_next.h"
 
 #define CONCAT(a, b) ((std::string(a) + b).c_str())
 
@@ -36,7 +36,7 @@ public:
 
         // Define protocols
         protocols.define("POCSAG", PROTOCOL_POCSAG);
-        //protocols.define("FLEX", PROTOCOL_FLEX);
+        protocols.define("FLEX", PROTOCOL_FLEX);
 
         // Initialize VFO with default values
         vfo = sigpath::vfoManager.createVFO(name, ImGui::WaterfallVFO::REF_CENTER, 0, 12500, 24000, 12500, 12500, true);
@@ -99,7 +99,7 @@ public:
             decoder = std::make_unique<POCSAGDecoder>(name, vfo);
             break;
         case PROTOCOL_FLEX:
-            decoder = std::make_unique<FLEXDecoder>(name, vfo);
+            decoder = std::make_unique<FLEXDecoderNext>(name, vfo);
             break;
         default:
             flog::error("Tried to select unknown pager protocol");
