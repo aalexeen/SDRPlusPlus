@@ -32,11 +32,17 @@ MessageParseResult BinaryParser::parseMessage(const MessageParseInput& input) co
         hex_stream << std::hex << std::uppercase << std::setfill('0');
 
         for (uint32_t i = 0; i < input.message_length; i++) {
-            uint32_t data_word = input.phase_data[input.message_word_start + i];
-            
-            // Output as 8-digit hex value
-            hex_stream << std::setw(8) << data_word;
-            
+            uint32_t word_index = input.message_word_start + i;
+
+            // Uncorrectable word (reference demod_flex_next.c:2652): mark it
+            // rather than emitting a decoded hex value for garbage bits.
+            if (input.word_error && input.word_error[word_index]) {
+                hex_stream << "????????";
+            } else {
+                // Output as 8-digit hex value
+                hex_stream << std::setw(8) << input.phase_data[word_index];
+            }
+
             // Add space separator between words (except for last word)
             if (i < (input.message_length - 1)) {
                 hex_stream << " ";

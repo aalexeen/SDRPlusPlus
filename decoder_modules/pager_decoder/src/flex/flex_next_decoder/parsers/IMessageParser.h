@@ -21,6 +21,12 @@ namespace flex_next_decoder {
         const uint32_t *phase_data = nullptr;
         uint32_t phase_data_size = 0;
 
+        // Per-word BCH status, parallel to phase_data (analog of reference
+        // demod_flex_next.c `bch_err[]`): 1 = uncorrectable, 0 = ok. When a word
+        // is flagged, parsers emit '?' for it instead of decoding garbage.
+        // May be nullptr (treated as all-ok) for callers that don't supply it.
+        const uint8_t *word_error = nullptr;
+
         // Message location in phase data
         uint32_t message_word_start = 0; // mw1 - start of message data
         uint32_t message_length = 0; // len - length in words

@@ -22,13 +22,19 @@ MessageParseResult NumericParser::parseMessage(const MessageParseInput& input) c
         std::string content;
         content.reserve(64); // Reserve reasonable space for numeric content
 
-        // Calculate message boundaries from vector word
-        // Original: int w1 = phaseptr[j] >> 7; int w2 = w1 >> 7;
+        // Calculate message boundaries from vector word.
+        // Matches C parse_numeric (demod_flex_next.c:2239-2242): w2 must be
+        // derived from the UNMASKED w1 so bits 14-16 (word count) survive.
+        // Masking w1 to 0x7F before the >>7 zeroed the count → truncated msgs.
+        //   int w1 = phaseptr[j] >> 7;
+        //   int w2 = w1 >> 7;
+        //   w1 = w1 & 0x7f;
+        //   w2 = (w2 & 0x07) + w1;
         uint32_t vector_word = input.phase_data[input.vector_word_index];
-        uint32_t w1 = (vector_word >> 7) & 0x7F;
-        uint32_t w2 = (w1 >> 7) & 0x07;
+        uint32_t w1 = vector_word >> 7;
+        uint32_t w2 = w1 >> 7;
         w1 = w1 & 0x7F;
-        w2 = w2 + w1;  // numeric message is 7 words max
+        w2 = (w2 & 0x07) + w1;  // w2 = start + word_count - 1
 
         // Check bounds
         if (w2 >= input.phase_data_size) {
@@ -37,15 +43,21 @@ MessageParseResult NumericParser::parseMessage(const MessageParseInput& input) c
             return result;
         }
 
-        // Get first data word
+        // Get first data word. dw_bad tracks the BCH status of the word
+        // currently loaded in data_word (reference demod_flex_next.c:2256-2265):
+        // when set, every BCD digit extracted from that word is emitted as '?'.
         uint32_t data_word;
         uint32_t start_word;
+        bool dw_bad;
         if (!input.long_address) {
+            dw_bad = input.word_error && input.word_error[w1];
             data_word = input.phase_data[w1];
             start_word = w1 + 1;
             w2++;
         } else {
-            data_word = input.phase_data[input.vector_word_index + 1];
+            uint32_t first = input.vector_word_index + 1;
+            dw_bad = input.word_error && input.word_error[first];
+            data_word = input.phase_data[first];
             start_word = w1;
         }
 
@@ -73,16 +85,25 @@ MessageParseResult NumericParser::parseMessage(const MessageParseInput& input) c
 
                 // Check if we have accumulated 4 bits (complete BCD digit)
                 if (--bit_count == 0) {
-                    // Convert BCD digit to character (skip fill characters)
-                    if (digit != BCD_FILL_CHAR && digit < FLEX_BCD.size()) {
+                    if (dw_bad) {
+                        // Uncorrectable word (reference demod_flex_next.c:2351-2352):
+                        // emit '?' for every BCD position of this word.
+                        content += '?';
+                    } else if (digit < FLEX_BCD.size()) {
+                        // Output ALL BCD digits, including 0x0C space-fill
+                        // (PARSE-11 / reference demod_flex_next.c:2354-2358):
+                        // the K checksum covers every BCD position, so dropping
+                        // fill characters would desync it. FLEX_BCD[0x0C] = ' '.
                         content += FLEX_BCD[digit];
                     }
                     bit_count = 4; // Reset for next digit
                 }
             }
-            
-            // Load next data word for processing
+
+            // Load next data word for processing, updating dw_bad to match
+            // (reference demod_flex_next.c:2368-2370).
             if (word_index < input.phase_data_size) {
+                dw_bad = input.word_error && input.word_error[word_index];
                 data_word = input.phase_data[word_index];
             }
         }

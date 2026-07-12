@@ -30,8 +30,24 @@ MessageParseResult AlphanumericParser::parseMessage(const MessageParseInput& inp
         content.reserve(input.message_length * 3 + 10); // Reserve space for efficiency
 
         for (uint32_t i = 0; i < input.message_length; i++) {
-            uint32_t data_word = input.phase_data[input.message_word_start + i];
-            
+            uint32_t word_index = input.message_word_start + i;
+
+            // Uncorrectable word (reference demod_flex_next.c:1921-1928): emit
+            // '?' for each of the three character slots instead of decoding
+            // garbage bits, then move on. The initial-fragment signature slot
+            // (i==0, frag==0x03) is normally suppressed; when the word is bad
+            // we still skip it, so the '?'-count matches the good-word path.
+            if (input.word_error && input.word_error[word_index]) {
+                if (i > 0 || input.fragment_number != 0x03) {
+                    addCharacterSafe('?', content, MAX_MESSAGE_LENGTH);
+                }
+                addCharacterSafe('?', content, MAX_MESSAGE_LENGTH);
+                addCharacterSafe('?', content, MAX_MESSAGE_LENGTH);
+                continue;
+            }
+
+            uint32_t data_word = input.phase_data[word_index];
+
             // Extract three 7-bit characters from the 21-bit data word
             unsigned char char1 = data_word & 0x7F;         // Bits 6-0
             unsigned char char2 = (data_word >> 7) & 0x7F;  // Bits 13-7

@@ -80,9 +80,14 @@ std::string ToneParser::extractShortNumeric(uint32_t vector_word, bool long_addr
     // For long addresses, extract additional digits from next vector word
     if (long_address) {
         uint32_t next_vector_index = input.vector_word_index + 1;
-        if (next_vector_index < input.phase_data_size) {
+        // Uncorrectable 2nd vector word (reference demod_flex_next.c:2470-2474):
+        // emit five '?' instead of decoding garbage.
+        if (input.word_error && next_vector_index < input.phase_data_size &&
+            input.word_error[next_vector_index]) {
+            content += "?????";
+        } else if (next_vector_index < input.phase_data_size) {
             uint32_t next_vector_word = input.phase_data[next_vector_index];
-            
+
             // Extract digits from next vector word
             // Original code: for (i=0; i<=16; i+=4)
             for (int bit_pos = 0; bit_pos <= 16; bit_pos += 4) {
