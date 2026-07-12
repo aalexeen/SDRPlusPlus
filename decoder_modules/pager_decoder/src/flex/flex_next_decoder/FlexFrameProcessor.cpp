@@ -1,5 +1,6 @@
 #include "FlexFrameProcessor.h"
 #include <iostream>
+#include <sstream>
 #include <algorithm>
 
 namespace flex_next_decoder {
@@ -113,6 +114,12 @@ namespace flex_next_decoder {
                 // words with the 0x1FFFFF idle sentinel: a genuinely uncorrectable
                 // address word is dropped here, not misread as idle.
                 if (i < word_error.size() && word_error[i]) {
+                    if (diagnostic_callback_) {
+                        std::ostringstream d;
+                        d << "drop|" << phase_name << "|idx=" << i << "|bad-address-word|raw=0x" << std::hex
+                          << phase_data[i];
+                        diagnostic_callback_(d.str());
+                    }
                     continue; // Address word uncorrectable, skip page
                 }
 
@@ -126,6 +133,12 @@ namespace flex_next_decoder {
                 AddressInfoWord aiw = processAddressInfoWord(phase_data[i], next_word);
 
                 if (!aiw.isValid()) {
+                    if (diagnostic_callback_) {
+                        std::ostringstream d;
+                        d << "drop|" << phase_name << "|idx=" << i << "|invalid-address|raw=0x" << std::hex
+                          << phase_data[i];
+                        diagnostic_callback_(d.str());
+                    }
                     continue; // Invalid address
                 }
 
@@ -136,6 +149,12 @@ namespace flex_next_decoder {
                 if (aiw.long_address) {
                     if (i + 1 >= biw.vector_offset ||
                         (i + 1 < word_error.size() && word_error[i + 1])) {
+                        if (diagnostic_callback_) {
+                            std::ostringstream d;
+                            d << "drop|" << phase_name << "|idx=" << i
+                              << "|bad-long-address-2nd-word|cap=" << aiw.capcode;
+                            diagnostic_callback_(d.str());
+                        }
                         i++; // consume the (bad/missing) 2nd word
                         continue;
                     }
@@ -144,6 +163,12 @@ namespace flex_next_decoder {
                 // Calculate vector word index
                 uint32_t vector_index = biw.vector_offset + i - biw.address_offset;
                 if (vector_index >= phase_data.size()) {
+                    if (diagnostic_callback_) {
+                        std::ostringstream d;
+                        d << "drop|" << phase_name << "|idx=" << i << "|vector-index-out-of-bounds|cap="
+                          << aiw.capcode;
+                        diagnostic_callback_(d.str());
+                    }
                     continue; // Vector index out of bounds
                 }
 
@@ -152,6 +177,12 @@ namespace flex_next_decoder {
                 // the message boundaries/type are unknown, so parsers can't run;
                 // done centrally here rather than duplicated in each parser.
                 if (vector_index < word_error.size() && word_error[vector_index]) {
+                    if (diagnostic_callback_) {
+                        std::ostringstream d;
+                        d << "drop|" << phase_name << "|vidx=" << vector_index << "|bad-vector-word|cap="
+                          << aiw.capcode;
+                        diagnostic_callback_(d.str());
+                    }
                     continue; // Vector word uncorrectable, skip page
                 }
 
@@ -171,6 +202,12 @@ namespace flex_next_decoder {
                 VectorInfoWord viw = processVectorInfoWord(phase_data[vector_index], aiw, header_word);
 
                 if (!viw.isValid()) {
+                    if (diagnostic_callback_) {
+                        std::ostringstream d;
+                        d << "drop|" << phase_name << "|vidx=" << vector_index << "|invalid-vector-info|cap="
+                          << aiw.capcode;
+                        diagnostic_callback_(d.str());
+                    }
                     continue; // Invalid vector info
                 }
 
@@ -216,6 +253,11 @@ namespace flex_next_decoder {
                 if (aiw.long_address) { i++; }
             } catch (const std::exception &e) {
                 // Continue processing other messages even if one fails
+                if (diagnostic_callback_) {
+                    std::ostringstream d;
+                    d << "drop|" << phase_name << "|idx=" << i << "|exception|" << e.what();
+                    diagnostic_callback_(d.str());
+                }
                 continue;
             }
         }
@@ -225,6 +267,10 @@ namespace flex_next_decoder {
 
     void FlexFrameProcessor::setMessageCallback(std::function<void(const ProcessedMessage &)> callback) {
         message_callback_ = std::move(callback);
+    }
+
+    void FlexFrameProcessor::setDiagnosticCallback(std::function<void(const std::string &)> callback) {
+        diagnostic_callback_ = std::move(callback);
     }
 
     void FlexFrameProcessor::setErrorCorrectionEnabled(bool enabled) { error_correction_enabled_ = enabled; }
@@ -267,12 +313,6 @@ namespace flex_next_decoder {
             phase_data[i] &= MESSAGE_BITS_MASK;
         }
 
-        if (verbosity_level_ >= 3 && (failed_words > 0 || corrected_words > 0)) {
-            std::cout << "FLEX_NEXT: Phase " << phase_name << " - Clean:" << clean_words
-                      << " Corrected:" << corrected_words << " Failed:" << failed_words
-                      << " Total:" << phase_data.size() << std::endl;
-        }
-
         // Never abandon the phase: the reference always parses what it can and
         // marks the rest with '?'. The old 50%-usable threshold was invented and
         // dropped whole phases the reference would have decoded (DROP-01b).
@@ -302,14 +342,7 @@ namespace flex_next_decoder {
 
         // Validate structure
         if (biw.vector_offset < biw.address_offset) {
-            if (verbosity_level_ >= 3) { std::cout << "Invalid structure: " << biw.raw_data << std::endl; }
             return biw; // Invalid structure
-        }
-
-        if (verbosity_level_ >= 3) {
-            std::cout << "FLEX_NEXT: BlockInfoWord: (Phase " << phase_name << ") BIW:" << std::hex << biw.raw_data
-                      << " AW " << std::dec << biw.address_offset << " VW " << biw.vector_offset << " (up to "
-                      << biw.max_pages << " pages)" << std::endl;
         }
 
         biw.max_pages = biw.vector_offset - biw.address_offset;

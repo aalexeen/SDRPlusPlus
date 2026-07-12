@@ -44,6 +44,13 @@ int main(int argc, char** argv) {
                    (long long)capcode, type, content.c_str());
         });
 
+    int drops = 0;
+    decoder.setDiagnosticCallback(
+        [&](const std::string& diag) {
+            drops++;
+            printf("DROP %s\n", diag.c_str());
+        });
+
     // Feed in chunks of 1024
     size_t off = 0;
     while (off < n) {
@@ -54,5 +61,6 @@ int main(int argc, char** argv) {
     }
 
     printf("TOTAL CALLBACKS: %d\n", callbacks);
+    printf("TOTAL DROPS: %d\n", drops);
     return 0;
 }

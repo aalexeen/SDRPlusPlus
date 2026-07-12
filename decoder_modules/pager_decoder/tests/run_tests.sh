@@ -59,6 +59,37 @@ check_nodecode() {
     fi
 }
 
+# check_drop <name> <fixture> <expected-DROP-substring>: assert the diagnostic
+# callback fired with the expected dropped-page reason (0-callback + a DROP line).
+# This is what makes "dropped pages are logged" a test, not a claim.
+check_drop() {
+    local name="$1" fixture="$2" expect="$3"
+    local out
+    out="$("$BUILD/cpp_harness" "$HERE/golden/$fixture" 2>/dev/null)"
+    if grep -qF -- "$expect" <<<"$out"; then
+        echo "PASS  $name"; pass=$((pass+1))
+    else
+        echo "FAIL  $name"
+        echo "      expected DROP substring: $expect"
+        echo "      --- actual output ---"
+        sed 's/^/      /' <<<"$out"
+        fail=$((fail+1))
+    fi
+}
+
+# check_nodrop <name> <fixture>: assert a CLEAN fixture produces ZERO drop
+# diagnostics (guards against false-positive drop logging / idle-skip leaking).
+check_nodrop() {
+    local name="$1" fixture="$2"
+    local n
+    n="$("$BUILD/cpp_harness" "$HERE/golden/$fixture" 2>/dev/null | grep -c '^DROP ')"
+    if [ "$n" -eq 0 ]; then
+        echo "PASS  $name"; pass=$((pass+1))
+    else
+        echo "FAIL  $name (expected 0 drop diagnostics, got $n)"; fail=$((fail+1))
+    fi
+}
+
 echo "== running golden fixtures =="
 # ALN: capcode 1234567, payload "HELLO FLEX 1234567890".
 # NOTE: frag field "0.0.C" is CURRENT behaviour; multimon-ng emits "3.0.K"
@@ -89,6 +120,14 @@ check "numeric-short" numeric_short_1600.s16 "NUM|12 34"
 # vector-gate (l.145). Regenerate: gen_flex_aln_corrupt.c "addr" / "vec".
 check_nodecode "aln-addr-corrupt" aln_addr_corrupt_1600.s16
 check_nodecode "aln-vec-corrupt"  aln_vec_corrupt_1600.s16
+# Diagnostic-logging: the same dropped pages must be surfaced via the diagnostic
+# callback (decoder_next.h tees this to $SDRPP_FLEX_LOG_DIR and the GUI list).
+# Without this the decoder is silent exactly when a message is lost.
+check_drop "addr-corrupt-diag" aln_addr_corrupt_1600.s16 "DROP drop|A|idx=1|bad-address-word"
+check_drop "vec-corrupt-diag"  aln_vec_corrupt_1600.s16  "DROP drop|A|vidx=2|bad-vector-word|cap=1234567"
+# A clean signal must produce ZERO drop diagnostics (idle skips are not logged).
+check_nodrop "aln-clean-nodrop"     aln_1600.s16
+check_nodrop "numeric-clean-nodrop" numeric_1600.s16
 
 # PHASE-01: differential test of the capcode long-address formula (no audio —
 # pure arithmetic swept across the address classification space).
@@ -101,6 +140,20 @@ if g++ -std=c++17 -O2 "$HERE/phase01_difftest.cpp" -o "$BUILD/phase01_difftest" 
     fi
 else
     echo "FAIL  phase01-difftest (build)"; fail=$((fail+1))
+fi
+
+# FlexFileLogger: unit-test the std-only file-logging layer (decoder_next.h's
+# writer) — open/append/flush when enabled, no-op + graceful when not. The GUI
+# wrapper can't compile standalone, so this covers the last unverified layer.
+echo "== flex file logger unit test =="
+if g++ -std=c++17 -O2 -I"$FLEX" "$HERE/filelogger_test.cpp" -o "$BUILD/filelogger_test" 2>/dev/null; then
+    if "$BUILD/filelogger_test" "$BUILD" | grep -q "^PASS"; then
+        echo "PASS  filelogger"; pass=$((pass+1))
+    else
+        echo "FAIL  filelogger"; "$BUILD/filelogger_test" "$BUILD" | tail -6; fail=$((fail+1))
+    fi
+else
+    echo "FAIL  filelogger (build)"; fail=$((fail+1))
 fi
 
 echo "== $pass passed, $fail failed =="

@@ -211,6 +211,15 @@ namespace flex_next_decoder {
         void setMessageCallback(std::function<void(const ProcessedMessage &)> callback);
 
         /**
+         * @brief Set diagnostic callback for abnormally dropped pages
+         * @param callback Function called with a one-line description whenever a
+         *        page is skipped for an abnormal reason (uncorrectable BCH word,
+         *        invalid address/vector, swallowed exception). NOT called for the
+         *        ordinary idle-word skip. Invoked on the DSP thread.
+         */
+        void setDiagnosticCallback(std::function<void(const std::string &)> callback);
+
+        /**
          * @brief Enable or disable BCH error correction
          * @param enabled true to enable error correction
          */
@@ -323,6 +332,7 @@ namespace flex_next_decoder {
         std::shared_ptr<FlexGroupHandler> group_handler_;
 
         std::function<void(const ProcessedMessage &)> message_callback_;
+        std::function<void(const std::string &)> diagnostic_callback_;
         bool error_correction_enabled_ = true;
 
         // Add sync information storage

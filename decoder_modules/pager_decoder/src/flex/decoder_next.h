@@ -11,8 +11,11 @@
 #include <thread>
 #include <mutex>
 #include <chrono>
+#include <fstream>
+#include <cstdlib>
 #include "../BCHCode.h" // BCH error correction (up one directory)
 #include "flex_next_decoder/FlexDecoder.h"
+#include "flex_next_decoder/FlexFileLogger.h"
 // #include "flex_next_decoder/parsers/IMessageParser.h"
 
 #include <iostream>
@@ -146,6 +149,24 @@ private:
     // push_back reallocation concurrent with GUI iteration is a use-after-free.
     std::mutex flexMessagesMutex;
 
+    // --- File logger (opt-in via env var SDRPP_FLEX_LOG_DIR) ---------------
+    // Single writer, only ever touched from the DSP thread (handleFlexMessage /
+    // the diagnostic callback). Never handed to the GUI thread, so it does not
+    // reintroduce the flexMessages cross-thread race. Opened once at init.
+    // Logic lives in the std-only FlexFileLogger so it is unit-testable in the
+    // standalone test harness (no SDR++ deps).
+    flex_next_decoder::FlexFileLogger flexLog;
+
+    // Open the log file if SDRPP_FLEX_LOG_DIR is set. Called once at init.
+    void initFlexLog() {
+        if (flexLog.open(name)) {
+            flog::info("FLEX file logging enabled -> {}", flexLog.path());
+        }
+    }
+
+    // Write one line to the log file (DSP thread only).
+    void flexLogLine(const std::string &line) { flexLog.line(line); }
+
     // Update showFlexMessageWindow
     void showFlexMessageWindow() {
         // Use window flags to prevent interaction with other windows
@@ -252,9 +273,6 @@ private:
 
         try {
             flexDecoderNext->processSample(sample);
-            if (verbosity_level_ >= 5) {
-                std::cout << typeid(*this).name() << ": processFlexSample called" << std::endl;
-            }
         } catch (const std::exception &e) {
             flog::error("Error in FLEX sample processing: {}", e.what());
             // Don't rethrow to avoid cascading crashes
@@ -271,14 +289,27 @@ private:
             flexDecoderNext = std::make_unique<flex_next_decoder::FlexDecoder>(
                     static_cast<uint32_t>(PAGER_AUDIO_SAMPLERATE), verbosity_level_);
 
+            // Open the opt-in file log (no-op unless SDRPP_FLEX_LOG_DIR is set)
+            initFlexLog();
+
             // Register callback to route messages to handleFlexMessage
             flexDecoderNext->setMessageCallback([this](int64_t addr, int type, const std::string& data) {
                 handleFlexMessage(addr, type, data);
             });
 
+            // Register diagnostic callback: surface abnormally dropped pages
+            // (uncorrectable BCH words, invalid address/vector, swallowed
+            // exceptions) that would otherwise vanish with zero output. Runs on
+            // the DSP thread. Tee to the log file and to the GUI message list.
+            flexDecoderNext->setDiagnosticCallback([this](const std::string& diag) {
+                flexLogLine(diag);
+                std::lock_guard<std::mutex> lck(flexMessagesMutex);
+                flexMessages.push_back("[" + diag + "]");
+            });
+
             // Configure decoder settings
             if (!flexDecoderNext) {
-                std::cout << "Failed to create FlexDecoder instance" << std::endl;
+                flog::error("Failed to create FlexDecoder instance");
                 return;
             }
 
@@ -331,8 +362,8 @@ private:
                 flexMessages.push_back(data);
             }
 
-            // Console output for testing
-            printf("FLEX: Addr=%ld Type=%d Data=%s\n", address, type, data.c_str());
+            // Tee to the opt-in file log (DSP thread, same as the diag callback)
+            flexLogLine(data);
 
             // Also use flog for SDR++ logging
             flog::info("FLEX Message - Addr: {}, Type: {}, Data: {}", address, type, data);

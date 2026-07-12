@@ -58,30 +58,14 @@ namespace flex_next_decoder {
         std::array<int, 31> received;
         uint32_t temp_data = data;
 
-        // Only print debug for non-zero data
-        if (data != 0 && verbosity_level_ >= 3) {
-            std::cout << "DEBUG: Input data=0x" << std::hex << data << std::dec << std::endl;
-        }
-
         /*Convert the data pattern into an array of coefficients (bits 30..0)*/
         for (int i = 0; i < 31; i++) {
             received[i] = (temp_data >> 30) & 1; // Extract MSB
             temp_data <<= 1; // Shift left for next bit
         }
 
-        // Only print bit pattern for non-zero data and high verbosity
-        if (data != 0 && verbosity_level_ >= 4) {
-            std::cout << "DEBUG: BCH input bits: ";
-            for (int i = 0; i < 31; i++) { std::cout << received[i]; }
-            std::cout << std::endl;
-        }
-
         // Apply BCH error correction
         int decode_result = bch_code_->decode(received.data()); // checked
-
-        if (data != 0 && verbosity_level_ >= 3) {
-            std::cout << "DEBUG: BCH decode result=" << decode_result << std::endl;
-        }
 
         if (decode_result == 0) {
             // Success: Convert corrected coefficients back to 32-bit format
@@ -106,33 +90,13 @@ namespace flex_next_decoder {
             // error count means 3+ real errors and the BCH "fix" is a
             // miscorrection (valid-looking but wrong). bch.c:542.
             if (errors_fixed > 0 && (countBits(received_parity_bit | corrected_data) & 1u)) {
-                if (data != 0 && verbosity_level_ >= 3) {
-                    std::cout << "FLEX_NEXT: Phase " << phase_id
-                              << " BCH miscorrection rejected (odd parity, 3+ errors) 0x"
-                              << std::hex << data << std::dec << std::endl;
-                }
                 return false;
-            }
-
-            if (errors_fixed > 0) {
-                if (verbosity_level_ >= 3) {
-                    std::cout << "FLEX_NEXT: Phase " << phase_id << " Fixed " << errors_fixed << " errors @ 0x"
-                              << std::hex << error_mask << " (0x" << std::hex << (data & 0x7FFFFFFF) << " -> 0x"
-                              << std::hex << corrected_data << ")" << std::dec << std::endl;
-                }
             }
 
             // Write corrected data back to caller
             data = corrected_data;
             return true;
         } else {
-            // Only log failures for non-zero data to reduce spam
-            if (data != 0) {
-                if (verbosity_level_ >= 3) {
-                    std::cout << "FLEX_NEXT: Phase " << phase_id << " Data corruption - Unable to fix errors (0x"
-                              << std::hex << data << std::dec << ")." << std::endl;
-                }
-            }
             return false;
         }
     }

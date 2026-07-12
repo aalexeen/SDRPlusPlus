@@ -135,6 +135,15 @@ namespace flex_next_decoder {
         void setMessageCallback(std::function<void(int64_t, int, const std::string &)> callback);
 
         /**
+         * @brief Set diagnostic callback for abnormally dropped pages
+         * @param callback Function called with a one-line description whenever a
+         *        page is skipped for an abnormal reason (uncorrectable BCH word,
+         *        invalid address/vector, swallowed exception). Invoked on the DSP
+         *        thread. Not called for ordinary idle-word skips.
+         */
+        void setDiagnosticCallback(std::function<void(const std::string &)> callback);
+
+        /**
          * @brief Get current decoder state
          * @return Current FlexState (Sync1, FIW, Sync2, Data)
          */
