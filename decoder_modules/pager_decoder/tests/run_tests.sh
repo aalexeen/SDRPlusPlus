@@ -110,6 +110,22 @@ check_no_bleed() {
     fi
 }
 
+# check_count <name> <fixture> <expected-callback-count>: assert the exact
+# number of message callbacks. Fragment reassembly must NOT change the message
+# count — each fragment still emits one line (the completing 'C' fragment's line
+# just grows to hold the reassembled text). A changed count means a fragment was
+# swallowed or duplicated.
+check_count() {
+    local name="$1" fixture="$2" want="$3"
+    local n
+    n="$("$BUILD/cpp_harness" "$HERE/golden/$fixture" 2>/dev/null | grep -c '^CALLBACK capcode')"
+    if [ "$n" -eq "$want" ]; then
+        echo "PASS  $name"; pass=$((pass+1))
+    else
+        echo "FAIL  $name (expected $want message callbacks, got $n)"; fail=$((fail+1))
+    fi
+}
+
 echo "== running golden fixtures =="
 # ALN: capcode 1234567, payload "HELLO FLEX 1234567890".
 # NOTE: frag field "0.0.C" is CURRENT behaviour; multimon-ng emits "3.0.K"
@@ -156,6 +172,25 @@ check_nodrop "numeric-clean-nodrop" numeric_1600.s16
 # history from ~76s for the (former) bleed to reproduce (it is stateful — a
 # shorter window loses it), so this fixture also guards the whole fragment path.
 check_no_bleed "frag-bleed-3200" frag_bleed_3200.s16
+# FRAG reassembly (Stage 2): the SAME fixture carries two interleaved fragment
+# streams both with msg_n=0 across frames 074-076 — capcode 6259133 (2-fragment
+# F+C, clean K+/SIG+) and 7303131 (3-fragment F+F+C). Keying the store on
+# (capcode, type, msg_n) separates them; keying on capcode=0 (the Stage-1 bug)
+# or msg_n alone re-collides them → bleed. The completing 'C' fragment's line
+# must carry the reassembled text.
+#   - 6259133: reassembled content is BYTE-IDENTICAL to multimon-ng's C.1/0 line.
+check "frag-reassemble-6259133" frag_bleed_3200.s16 \
+      "From: rths@careaware.com Subject: RTHS Alert - RQSTD (T): Name: MILLS, MARK Age: 62 years FIN: 16329399 Gender: Male Origin Unit: Regional Emergency Department Admitting: Attending: Ahmed Bendary DO Level of Care:  [14]"
+#   - 7303131 (3-fragment, K- so its tail has uncorrectable '?' words): assert the
+#     178-char CLEAN reassembled prefix (F+F+C chained). The corrupted tail past
+#     char 178 diverges from multimon only inside '?'-runs — that is the known
+#     BCH permissive residual (BCH-02, deferred), NOT a reassembly defect (both
+#     strings are 214 chars, so word alignment/boundaries match exactly).
+check "frag-reassemble-7303131-prefix" frag_bleed_3200.s16 \
+      "From: rths@careaware.com Subject: RTHS Alert - RQSTD (T): Name: MILLS, MARK Age: 62 years FIN: 16329399 Gender: Male Origin Unit: Regiona, e"
+# Reassembly must not change the message count: still 11 callbacks (each fragment
+# emits its own line; only the completing 'C' line grows).
+check_count "frag-count-unchanged" frag_bleed_3200.s16 11
 
 # PHASE-01: differential test of the capcode long-address formula (no audio —
 # pure arithmetic swept across the address classification space).

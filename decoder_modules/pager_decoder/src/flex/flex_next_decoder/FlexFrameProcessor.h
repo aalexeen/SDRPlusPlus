@@ -59,8 +59,9 @@ namespace flex_next_decoder {
         uint32_t message_word_start = 0; // Start of message data
         uint32_t message_length = 0; // Length in words
         uint32_t header_word_index = 0; // Header word location
-        uint32_t fragment_number = 0; // Fragment info (0-3)
-        bool continuation_flag = false; // Continuation flag
+        uint32_t fragment_number = 0; // Fragment info (0-3), header bits 11-12 (F)
+        bool continuation_flag = false; // Continuation flag, header bit 10 (C)
+        uint32_t message_number = 0; // N field, header bits 13-18 (identifies fragment stream)
         bool is_valid = false;
 
         // Short Instruction specific fields

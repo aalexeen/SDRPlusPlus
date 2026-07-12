@@ -456,10 +456,13 @@ namespace flex_next_decoder {
             }
         }
 
-        // Extract fragment information from header word if available
+        // Extract fragment information from header word if available.
+        // Header layout (Section 3.10.1.3): bits 0-9 K, bit 10 C, bits 11-12 F,
+        // bits 13-18 N (message number, identifies the fragment stream).
         if (header_word != 0) {
             viw.fragment_number = (header_word >> 11) & 0x3;
             viw.continuation_flag = (header_word >> 10) & 0x1;
+            viw.message_number = (header_word >> 13) & 0x3F;
         }
 
         // Validate message bounds. The message_length field is only meaningful
@@ -529,6 +532,7 @@ namespace flex_next_decoder {
         input.vector_word_index = vector_index; // C `j`: Numeric/Tone re-read the raw vector word here
         input.fragment_number = vector_info.fragment_number;
         input.continuation_flag = vector_info.continuation_flag;
+        input.message_number = vector_info.message_number;
         input.is_group_message = address_info.is_group_message;
         input.group_bit = address_info.group_bit;
         input.cycle_number = cycle_number;

@@ -67,7 +67,7 @@ namespace flex_next_decoder {
             }
 
             // Handle fragment assembly if enabled
-            if (options.enable_fragment_assembly && result.success) { processFragment(result); }
+            if (options.enable_fragment_assembly && result.success) { processFragment(input, result); }
 
             // Post-process message content
             if (result.success) { postProcessMessage(result); }
@@ -104,28 +104,80 @@ namespace flex_next_decoder {
         }
     }
 
-    bool FlexMessageDecoder::processFragment(MessageParseResult & /*result*/) {
-        // STAGE 1 (leak fix): pass fragmented pages through unchanged so each
-        // fragment emits its OWN already-parsed content and keeps its own frag
-        // flag. Real cross-fragment reassembly (frag_find/frag_alloc + FragStore
-        // + K-checksum + dedup, ~247 lines in demod_flex_next.c) is deferred to
-        // Stage 2.
+    bool FlexMessageDecoder::processFragment(const MessageParseInput &input, MessageParseResult &result) {
+        // Cross-fragment reassembly, ported from demod_flex_next.c parse_alphanumeric
+        // (F/C branches) + frag_find/frag_alloc/frag_append/frag_release.
         //
-        // The old buffering logic here was a broken facade and the source of the
-        // off-air "content/type bleed": it hardcoded capcode = 0, so every
-        // sender's fragments collided into a single buffer, and on a Continuation
-        // it (a) forced the flag to Complete ('K' instead of 'C') and (b)
-        // replaced the message with the mixed accumulation of that shared buffer
-        // — dumping unrelated words (incl. raw hex from a colliding binary page)
-        // into ALN text. Doing nothing here is strictly correct until real
-        // reassembly exists: an unreassembled fragment showing its own clean
-        // text is right; a mis-reassembled one is not.
+        // Only F (more coming) and C (last/completing) fragments reach the store;
+        // K (complete-in-one-page) and Unknown return immediately. The parser has
+        // already produced clean per-fragment text (signature stripped on the F=11
+        // initial word), so this layer only concatenates — it does not re-parse.
+        if (result.fragment_flag == FragmentFlag::Complete ||
+            result.fragment_flag == FragmentFlag::Unknown) {
+            return false; // K / non-fragment: nothing to reassemble
+        }
+
+        // Reassembly only applies to alphanumeric-family messages. Numeric/Tone/
+        // Binary do not fragment (reference treats frag/cont as no-ops for them);
+        // they are already excluded because their parsers emit FragmentFlag::Unknown,
+        // but gate explicitly so a future parser change can't leak them in here.
+        if (input.type != MessageType::Alphanumeric && input.type != MessageType::Secure) {
+            return false;
+        }
+
+        const FragmentKey key{ input.capcode, static_cast<int>(input.type), input.message_number };
+        const uint32_t abs_frame = input.cycle_number * 128 + input.frame_number;
+        const bool is_initial = (input.fragment_number == 0x03); // F=11
+        const bool more_coming = (result.fragment_flag == FragmentFlag::Fragment); // 'F'
+
+        if (more_coming) {
+            // 'F' — first or middle fragment: buffer this fragment's text, but
+            // still let it be emitted with its own partial content (multimon does
+            // the same: F lines print their own partial). We only ACCUMULATE here.
+            auto it = fragment_slots_.find(key);
+            if (is_initial && it != fragment_slots_.end()) {
+                // A new initial fragment for a stream we were already buffering:
+                // the old partial is abandoned (reference emits it then releases;
+                // we just drop the stale slot — the old partial already went out
+                // as its own line when it was received).
+                fragment_slots_.erase(it);
+                it = fragment_slots_.end();
+            }
+            if (it == fragment_slots_.end()) {
+                evictIfFull();
+                FragmentSlot slot;
+                slot.frame_received = abs_frame;
+                it = fragment_slots_.emplace(key, std::move(slot)).first;
+            }
+            it->second.data += result.content;
+            return false; // result.content unchanged — this fragment shows its own text
+        }
+
+        // 'C' — last/completing fragment: prepend the buffered fragments' text.
+        auto it = fragment_slots_.find(key);
+        if (it != fragment_slots_.end() && !it->second.data.empty()) {
+            result.content = it->second.data + result.content;
+            result.fragment_flag = FragmentFlag::Complete; // now a whole message
+            fragment_slots_.erase(it);
+            return true;
+        }
+
+        // Orphaned continuation (no buffered initial — e.g. we joined mid-stream):
+        // emit this fragment's own content, no prepend. Matches the reference
+        // "no buffered fragment found, output what we have" path.
         return false;
     }
 
-    void FlexMessageDecoder::clearFragmentBuffers() { fragment_buffers_.clear(); }
-
-    size_t FlexMessageDecoder::getPendingFragmentCount() const { return fragment_buffers_.size(); }
+    void FlexMessageDecoder::evictIfFull() {
+        if (fragment_slots_.size() < FRAG_MAX_SLOTS) { return; }
+        // Evict the slot with the oldest first-fragment frame (mirrors the C
+        // frag_alloc oldest-frame eviction when the 64-slot store is full).
+        auto oldest = fragment_slots_.begin();
+        for (auto it = fragment_slots_.begin(); it != fragment_slots_.end(); ++it) {
+            if (it->second.frame_received < oldest->second.frame_received) { oldest = it; }
+        }
+        fragment_slots_.erase(oldest);
+    }
 
     const MessageStatistics &FlexMessageDecoder::getStatistics() const { return statistics_; }
 

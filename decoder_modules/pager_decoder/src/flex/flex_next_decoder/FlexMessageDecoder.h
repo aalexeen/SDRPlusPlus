@@ -9,6 +9,8 @@
 #include "FlexGroupHandler.h"
 #include <memory>
 #include <unordered_map>
+#include <map>
+#include <tuple>
 #include <string>
 #include <vector>
 #include <utility>
@@ -67,42 +69,18 @@ namespace flex_next_decoder {
     };
 
     /**
-     * @struct FragmentBuffer
-     * @brief Buffer for assembling fragmented messages
+     * @struct FragmentSlot
+     * @brief One in-progress fragment-reassembly stream.
+     *
+     * A stream is identified by (capcode, type, msg_n) — the reference
+     * demod_flex_next.c FragStore key (frag_find). Keying on all three is what
+     * separates two senders (or two message streams) whose fragments interleave
+     * across the same frames; keying on capcode alone (or the old capcode=0
+     * bug) let them collide and bleed into each other.
      */
-    struct FragmentBuffer {
-        std::string assembled_content;
-        FragmentFlag last_fragment_flag = FragmentFlag::Unknown;
-        int64_t capcode = 0;
-        uint32_t fragment_count = 0;
-        bool is_complete = false;
-
-        /**
-         * @brief Add fragment to buffer
-         * @param content Fragment content
-         * @param flag Fragment flag
-         * @return true if message is now complete
-         */
-        bool addFragment(const std::string &content, FragmentFlag flag) {
-            assembled_content += content;
-            last_fragment_flag = flag;
-            fragment_count++;
-
-            if (flag == FragmentFlag::Complete || flag == FragmentFlag::Continuation) { is_complete = true; }
-
-            return is_complete;
-        }
-
-        /**
-         * @brief Reset fragment buffer
-         */
-        void reset() {
-            assembled_content.clear();
-            last_fragment_flag = FragmentFlag::Unknown;
-            capcode = 0;
-            fragment_count = 0;
-            is_complete = false;
-        }
+    struct FragmentSlot {
+        std::string data; // accumulated text of the fragments seen so far
+        uint32_t frame_received = 0; // absolute frame of the FIRST fragment (for eviction)
     };
 
     /**
@@ -203,22 +181,14 @@ namespace flex_next_decoder {
         //=========================================================================
 
         /**
-         * @brief Process message fragment and attempt assembly
-         * @param result Message parse result (potentially modified)
-         * @return true if fragment was processed (assembled or buffered)
+         * @brief Process a message fragment: buffer F fragments and reassemble
+         *        on the terminating C fragment.
+         * @param input  Original parse input (supplies capcode/type/msg_n/frame)
+         * @param result Message parse result (content replaced with the
+         *               reassembled text on a completing C fragment)
+         * @return true if the result was modified (reassembled)
          */
-        bool processFragment(MessageParseResult &result);
-
-        /**
-         * @brief Clear all fragment buffers
-         */
-        void clearFragmentBuffers();
-
-        /**
-         * @brief Get number of pending fragments
-         * @return Number of incomplete fragment sequences
-         */
-        size_t getPendingFragmentCount() const;
+        bool processFragment(const MessageParseInput &input, MessageParseResult &result);
 
         //=========================================================================
         // Statistics and Monitoring
@@ -335,6 +305,11 @@ namespace flex_next_decoder {
          */
         void buildParserMap();
 
+        /**
+         * @brief Evict the oldest fragment slot if the store is at capacity.
+         */
+        void evictIfFull();
+
         //=========================================================================
         // Member Variables
         //=========================================================================
@@ -352,8 +327,15 @@ namespace flex_next_decoder {
         DecodingOptions options_;
         MessageStatistics statistics_;
 
-        // Fragment assembly
-        std::unordered_map<int64_t, FragmentBuffer> fragment_buffers_; // Keyed by capcode
+        // Fragment reassembly store — keyed by (capcode, type, msg_n), the
+        // reference FragStore key. Lives entirely on the decode thread (only
+        // touched from parseMessage → processFragment); never shared with the
+        // GUI, so it cannot recreate the CRASH-01 data race. Bounded to
+        // FRAG_MAX_SLOTS with oldest-frame eviction, mirroring the C 64-slot
+        // ring so it cannot grow unbounded on a live stream.
+        using FragmentKey = std::tuple<int64_t, int, uint32_t>; // capcode, type, msg_n
+        std::map<FragmentKey, FragmentSlot> fragment_slots_;
+        static constexpr size_t FRAG_MAX_SLOTS = 64;
 
         // State management
         bool statistics_enabled_ = true;

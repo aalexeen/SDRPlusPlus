@@ -35,6 +35,7 @@ namespace flex_next_decoder {
         // Fragment information
         uint32_t fragment_number = 0; // frag (0-3)
         bool continuation_flag = false; // cont
+        uint32_t message_number = 0; // msg_n / N field — identifies the fragment stream
 
         // Group messaging
         bool is_group_message = false;
