@@ -79,6 +79,22 @@ public:
      * @return Parsed message result with raw hex data
      */
     MessageParseResult parseAsDefault(const MessageParseInput& input) const;
+
+private:
+    /**
+     * @brief Decode the HEX/Binary body into a nibble hex string.
+     *
+     * Ports demod_flex_next.c parse_binary: continuous LSB-first 4-bit nibble
+     * extraction across 21-bit words, hdr2 skip on the initial fragment, and
+     * termination-fill stripping on the last fragment. Signature/blocking/
+     * direction annotation and HEX fragment reassembly are intentionally NOT
+     * handled here (annotation lives in the OutputFormatter; reassembly is
+     * gated to alphanumeric-family messages only).
+     *
+     * @param input Message parsing parameters
+     * @return Hex string (nibbles, uppercase), '?' for uncorrectable words
+     */
+    static std::string extractHexContent(const MessageParseInput& input);
 };
 
 } // namespace flex_next_decoder

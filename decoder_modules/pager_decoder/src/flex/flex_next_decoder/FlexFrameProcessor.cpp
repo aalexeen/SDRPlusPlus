@@ -456,13 +456,20 @@ namespace flex_next_decoder {
             }
         }
 
-        // Extract fragment information from header word if available.
-        // Header layout (Section 3.10.1.3): bits 0-9 K, bit 10 C, bits 11-12 F,
-        // bits 13-18 N (message number, identifies the fragment stream).
+        // Extract fragment information from header word if available. The bit
+        // layout is TYPE-DEPENDENT (reference demod_flex_next.c:3730-3778):
+        //   HEX/Binary (V=110): 12-bit K, C at bit 12, F at bits 13-14, N at 15-20
+        //   Alpha/Secure/Numeric: 10-bit K, C at bit 10, F at bits 11-12, N at 13-18
         if (header_word != 0) {
-            viw.fragment_number = (header_word >> 11) & 0x3;
-            viw.continuation_flag = (header_word >> 10) & 0x1;
-            viw.message_number = (header_word >> 13) & 0x3F;
+            if (viw.message_type == MessageType::Binary) {
+                viw.fragment_number = (header_word >> 13) & 0x3;
+                viw.continuation_flag = (header_word >> 12) & 0x1;
+                viw.message_number = (header_word >> 15) & 0x3F;
+            } else {
+                viw.fragment_number = (header_word >> 11) & 0x3;
+                viw.continuation_flag = (header_word >> 10) & 0x1;
+                viw.message_number = (header_word >> 13) & 0x3F;
+            }
         }
 
         // Validate message bounds. The message_length field is only meaningful

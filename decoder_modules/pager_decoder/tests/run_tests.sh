@@ -191,6 +191,15 @@ check "frag-reassemble-7303131-prefix" frag_bleed_3200.s16 \
 # Reassembly must not change the message count: still 11 callbacks (each fragment
 # emits its own line; only the completing 'C' line grows).
 check_count "frag-count-unchanged" frag_bleed_3200.s16 11
+# BIN/HEX parser (PARSE-06): capcode 8278737 is a complete (K) HEX page. The old
+# BinaryParser dumped raw %08X words; the rewrite unpacks the FLEX HEX body —
+# continuous LSB-first 4-bit nibbles across 21-bit words, hdr2 skip on the
+# initial fragment, and termination-fill stripping — so the content is
+# BYTE-IDENTICAL to multimon-ng's HEX line (160 nibbles). Also exercises the
+# type-dependent fragment-header layout fix (Binary: C@bit12/F@13-14/N@15-20 vs
+# alpha C@10/F@11-12/N@13-18) — without it this page mis-reads as frag=1/cont=1.
+check "bin-hex-unpack" frag_bleed_3200.s16 \
+      "F41172D5D84227F509AEC344AA238AF38BEF13B7AEA09C33ED130E813466B460E75CE11F23D740D1D18243781D8B14F1413CB233CE5329AE288F9AC480F34CFC005FD64DB3C778B96F23D3A1DB68C72A"
 
 # PHASE-01: differential test of the capcode long-address formula (no audio —
 # pure arithmetic swept across the address classification space).
