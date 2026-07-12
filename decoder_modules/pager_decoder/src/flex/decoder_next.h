@@ -116,6 +116,7 @@ public:
         try {
             audioHandler.stop();
             dsp.stop();
+            flexLog.flushRaw(); // ensure a raw capture is complete on stop
             flog::info("FLEX decoder stopped");
         } catch (const std::exception &e) { flog::error("Error stopping FLEX decoder: {}", e.what()); }
     }
@@ -139,6 +140,9 @@ private:
     void initFlexLog() {
         if (flexLog.open(name)) {
             flog::info("FLEX file logging enabled -> {}", flexLog.path());
+        }
+        if (flexLog.openRaw(name)) {
+            flog::info("FLEX raw audio capture enabled -> {} (22050 Hz s16, capped)", flexLog.rawPath());
         }
     }
 
@@ -192,33 +196,12 @@ private:
     }
 
     static void _audioHandler(float *data, int count, void *ctx) {
-        static int total_samples = 0;
-        total_samples += count;
-
-        // Log every 22050 samples (1 second worth)
-        /*if (total_samples % 22050 < count) {
-            flog::info("Audio handler: {} samples this call, {} total", count, total_samples);
-        }*/
-
         FLEXDecoderNext *_this = (FLEXDecoderNext *) ctx;
         if (_this && _this->initialized) { _this->processAudioSamples(data, count); }
     }
 
     void processAudioSamples(float *samples, int count) {
-        if (!initialized || !samples || count <= 0) {
-            flog::info("processAudioSamples: Invalid call - init={}, samples={}, count={}", initialized,
-                       static_cast<const void *>(samples), count);
-            return;
-        }
-
-        // Log sample reception periodically for debugging
-        static int sample_counter = 0;
-        sample_counter += count;
-
-        /*if (sample_counter % (44100 * 5) == 0) {
-            // Log every 5 seconds
-            flog::info("FLEX decoder received {} samples (total: {})", count, sample_counter);
-        }*/
+        if (!initialized || !samples || count <= 0) { return; }
 
         try {
             // Process samples in smaller chunks to avoid overflow
@@ -237,6 +220,12 @@ private:
 
                     // Clamp sample to reasonable range
                     sample = std::clamp(sample, -10.0f, 10.0f);
+
+                    // Raw capture: dump the EXACT sample the decoder consumes
+                    // (post clamp/skip), so a replay through the test harness /
+                    // multimon reproduces this decode bit-for-bit. No-op unless
+                    // SDRPP_FLEX_RAW_DIR is set.
+                    flexLog.raw(&sample, 1);
 
                     // Feed to FLEX decoder
                     processFlexSample(sample);

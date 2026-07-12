@@ -82,6 +82,53 @@ int main(int argc, char **argv) {
         log.line("nowhere"); // must not crash
     }
 
+    // 5) Raw capture: float→s16 scale is the exact inverse of the harness read
+    //    (x32768), int16 clamp holds, and the readback round-trips.
+    {
+        FlexFileLogger log;
+        bool ok = log.openRawDir(dir, "raw");
+        check(ok, "openRawDir on writable dir returns true");
+        check(log.rawEnabled(), "rawEnabled() true after open");
+        // 1.0 -> +32767 (clamped from 32768), -1.0 -> -32768, 0 -> 0,
+        // and an over-range 5.0 must clamp to +32767 (not int overflow-wrap).
+        float in[] = { 0.0f, 1.0f, -1.0f, 0.5f, 5.0f };
+        log.raw(in, 5);
+        log.flushRaw();
+        check(log.rawBytes() == 10, "raw wrote 2 bytes per sample");
+        // Read back the s16 LE and confirm values.
+        std::ifstream f(dir + "/flex_raw.s16", std::ios::binary);
+        int16_t s[5];
+        f.read(reinterpret_cast<char *>(s), 10);
+        check(s[0] == 0, "0.0 -> 0");
+        check(s[1] == 32767, "1.0 -> +32767 (clamped)");
+        check(s[2] == -32768, "-1.0 -> -32768");
+        check(s[3] == 16384, "0.5 -> 16384");
+        check(s[4] == 32767, "5.0 over-range -> +32767 (no overflow wrap)");
+    }
+
+    // 6) Raw size cap: writing past the cap stops silently, file stays bounded.
+    {
+        FlexFileLogger log;
+        // Cap at 8 bytes = 4 samples.
+        bool ok = log.openRawDir(dir, "rawcap", 8);
+        check(ok, "openRawDir with cap returns true");
+        float buf[10] = { 0 };
+        log.raw(buf, 10); // ask for 20 bytes, cap is 8
+        check(log.rawBytes() == 8, "raw honors the size cap (8 bytes)");
+        check(log.rawCapped(), "rawCapped() true after cap hit");
+    }
+
+    // 7) Raw disabled path: env unset + openRaw -> no file, no-op.
+    {
+        unsetenv("SDRPP_FLEX_RAW_DIR");
+        FlexFileLogger log;
+        bool ok = log.openRaw("norawenv");
+        check(!ok, "openRaw returns false when SDRPP_FLEX_RAW_DIR unset");
+        check(!log.rawEnabled(), "rawEnabled() false when env unset");
+        float buf[4] = { 0 };
+        log.raw(buf, 4); // must not crash
+    }
+
     if (failures == 0) {
         printf("PASS\n");
         return 0;
