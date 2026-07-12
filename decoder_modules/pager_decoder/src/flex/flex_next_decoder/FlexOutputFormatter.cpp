@@ -71,17 +71,9 @@ namespace flex_next_decoder {
         // Get the complete formatted message
         std::string complete_message = formatted_message.str();
 
-        // Console output (keep existing behavior)
-        std::cout << complete_message << std::endl;
-
         // NEW: Send to GUI via callback if available
         if (message_callback_ && !message.content.empty()) {
             message_callback_(msg_info.capcode, static_cast<int>(msg_info.type), complete_message);
-        }
-
-        // Optional debug output at higher verbosity levels
-        if (getVerbosityLevel() >= 3 && !message.content.empty()) {
-            std::cout << "DEBUG: Message parsed successfully" << std::endl;
         }
     }
 

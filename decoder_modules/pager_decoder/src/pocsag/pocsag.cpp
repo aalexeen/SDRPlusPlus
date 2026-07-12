@@ -95,9 +95,6 @@ namespace pocsag {
     }
 
     void printbin(uint32_t cw) {
-        for (int i = 31; i >= 0; i--) {
-            printf("%c", ((cw >> i) & 1) ? '1':'0');
-        }
     }
 
     void bitswapChar(char in, char& out) {

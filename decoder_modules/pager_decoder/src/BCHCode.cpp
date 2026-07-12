@@ -30,15 +30,6 @@ BCHCode::BCHCode(const int *p, int m, int n, int k, int t) : m_(m), n_(n), k_(k)
     // Generate Galois Field lookup tables
     generateGaloisField();
 
-    // Debug: Print first few GF table entries
-    /*std::cout << "DEBUG GF: First 10 alpha_to_ entries: ";
-    for (int i = 0; i < std::min(10, n_); i++) { std::cout << alpha_to_[i] << " "; }
-    std::cout << std::endl;
-
-    std::cout << "DEBUG GF: First 10 index_of_ entries: ";
-    for (int i = 0; i < std::min(10, n_); i++) { std::cout << index_of_[i] << " "; }
-    std::cout << std::endl;*/
-
     // Generate BCH generator polynomial
     generatePolynomial();
 }
@@ -240,50 +231,28 @@ int BCHCode::decode(int *received) { // checked
         s[i] = index_of_[s[i]];
     }
 
-    // Only print debug for actual errors
-    /*if (syn_error) {
-        std::cout << "DEBUG BCH: syn_error=" << syn_error << " s[1]=" << s[1] << " s[2]=" << s[2] << " s[3]=" << s[3]
-                  << " s[4]=" << s[4] << std::endl;
-    }*/
-
     if (syn_error) {
         if (s[1] != -1) {
             s3 = (s[1] * 3) % n_;
             if (s[3] == s3) {
                 // Single error case
                 received[s[1]] ^= 1;
-                // std::cout << "DEBUG BCH: Single error corrected at position " << s[1] << std::endl;
             } else {
-                // Two error case - ADD COMPREHENSIVE DEBUGGING
-                // std::cout << "DEBUG BCH: Two-error case - s3=" << s3 << " s[3]=" << s[3] << std::endl;
-
+                // Two error case
                 if (s[3] != -1) {
                     aux = alpha_to_[s3] ^ alpha_to_[s[3]];
-                    /*std::cout << "DEBUG BCH: aux = alpha_to_[" << s3 << "] ^ alpha_to_[" << s[3]
-                              << "] = " << alpha_to_[s3] << " ^ " << alpha_to_[s[3]] << " = " << aux << std::endl;*/
                 } else {
                     aux = alpha_to_[s3];
-                    /*std::cout << "DEBUG BCH: aux = alpha_to_[" << s3 << "] = " << aux << " (s[3] was -1)" <<
-                     * std::endl;*/
                 }
 
-                // Check if aux is valid
-                /*if (aux == 0 || index_of_[aux] == -1) {
-                    //std::cout << "DEBUG BCH: Invalid aux calculation - uncorrectable" << std::endl;
-                    retval = 1;
-                } else {*/
                 elp[0] = 0;
                 elp[1] = (s[2] - index_of_[aux] + n_) % n_;
                 elp[2] = (s[1] - index_of_[aux] + n_) % n_;
 
-                /*std::cout << "DEBUG BCH: Error locator polynomial: elp[0]=" << elp[0] << " elp[1]=" << elp[1]
-                          << " elp[2]=" << elp[2] << std::endl;*/
-
-                // Chien search with detailed debugging
+                // Chien search
                 for (int i = 1; i <= 2; i++) { reg[i] = elp[i]; }
                 count = 0;
 
-                /*std::cout << "DEBUG BCH: Starting Chien search..." << std::endl;*/
                 for (int i = 1; i <= n_; i++) {
                     int q = 1;
                     for (int j = 1; j <= 2; j++) {
@@ -295,31 +264,16 @@ int BCHCode::decode(int *received) { // checked
                     if (!q) {
                         loc[count] = i % n_;
                         count++;
-                        /*std::cout << "DEBUG BCH: Found error location at i=" << i << " position=" << (i % n_)
-                                  << std::endl;*/
                     }
-                    // Debug first few iterations
-                    /*if (i <= 5) {
-                        std::cout << "DEBUG BCH: i=" << i << " q=" << q << " reg[1]=" << reg[1]
-                                  << " reg[2]=" << reg[2] << std::endl;
-                    }*/
                 }
-
-                // std::cout << "DEBUG BCH: Chien search complete. Found " << count << " error locations" <<
-                // std::endl;
 
                 if (count == 2) {
                     for (int i = 0; i < 2; i++) { received[loc[i]] ^= 1; }
-                    /*std::cout << "DEBUG BCH: Two errors corrected at positions " << loc[0] << " and " << loc[1]
-                              << std::endl;*/
                 } else {
-                    // std::cout << "DEBUG BCH: Expected 2 errors but found " << count << std::endl;
                     retval = 1;
                 }
-                //}
             }
         } else if (s[2] != -1) {
-            // std::cout << "DEBUG BCH: Error detection case" << std::endl;
             retval = 1;
         }
     }

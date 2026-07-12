@@ -99,7 +99,6 @@ namespace flex_next_decoder {
         void checkLockPattern();
 
         uint8_t getModalSymbol() const {
-            if (getVerbosityLevel() >= 5) { std::cout << typeid(*this).name() << "getModalSymbol called" << std::endl; }
             return modal_symbol_;
         }
 

@@ -27,18 +27,12 @@ namespace flex_next_decoder {
         // Equivalent to original C code when lock is acquired:
         // flex->Demodulator.symbol_count = 0;
         // flex->Demodulator.sample_count = 0;
-        if (getVerbosityLevel() >= 5) {
-            std::cout << typeid(*this).name() << ": " << "resetCounters called" << std::endl;
-        }
         symbol_count_ = 0;
         sample_count_ = 0;
     }
 
     bool FlexDemodulator::buildSymbol(float sample) {
         // Direct port of buildSymbol() function from demod_flex_next.c
-        if (getVerbosityLevel() >= 5) {
-            std::cout << typeid(*this).name() << ": " << "buildSymbol called" << std::endl;
-        }
         const int64_t phase_max = 100 * sample_frequency_;
         // Maximum value for phase (calculated to divide by sample frequency without remainder)
         const int64_t phase_rate = phase_max * current_baud_ / sample_frequency_; // Increment per baseband sample
@@ -63,9 +57,6 @@ namespace flex_next_decoder {
             timeout_counter_ = 0;
             non_consecutive_counter_ = 0;
             state_machine_->changeState(FlexState::Sync1);
-            if (getVerbosityLevel() >= 5) {
-                std::cout << typeid(*this).name() << ": " << "resetCounters called" << std::endl;
-            }
         }
 
         // Count symbol levels during MID 80% SYMBOL PERIOD
@@ -90,9 +81,6 @@ namespace flex_next_decoder {
         // Direct port from original C code:
         // flex->Modulation.zero = (flex->Modulation.zero*(FREQ_SAMP*DC_OFFSET_FILTER) + sample) /
         // ((FREQ_SAMP*DC_OFFSET_FILTER) + 1);
-        if (getVerbosityLevel() >= 5) {
-            std::cout << typeid(*this).name() << ": " << "updateDCOffset called" << std::endl;
-        }
         const double filter_term = sample_frequency_ * DC_OFFSET_FILTER;
         zero_offset_ = (zero_offset_ * filter_term + sample) / (filter_term + 1.0);
     }
@@ -102,9 +90,6 @@ namespace flex_next_decoder {
         // flex->Demodulator.envelope_sum += fabs(sample);
         // flex->Demodulator.envelope_count++;
         // flex->Modulation.envelope = flex->Demodulator.envelope_sum / flex->Demodulator.envelope_count;
-        if (getVerbosityLevel() >= 5) {
-            std::cout << typeid(*this).name() << ": " << "updateEnvelope called" << std::endl;
-        }
         envelope_sum_ += std::abs(sample);
         envelope_count_++;
         envelope_ = envelope_sum_ / envelope_count_;
@@ -113,9 +98,6 @@ namespace flex_next_decoder {
     /*Count the number of occurrences of each symbol value for analysis at end of symbol period*/
     void FlexDemodulator::countSymbolLevels(float sample) { // checked
         // Direct port from original C code symbol counting logic
-        if (getVerbosityLevel() >= 5) {
-            std::cout << typeid(*this).name() << ": " << "countSymbolLevels called" << std::endl;
-        }
         if (sample > 0.0) {
             if (sample > envelope_ * SLICE_THRESHOLD) {
                 symbol_counts_[3]++; // Level 3 (highest positive)
@@ -133,9 +115,6 @@ namespace flex_next_decoder {
 
     void FlexDemodulator::processZeroCrossing(float sample, double phase_percent, int64_t phase_max) { // checked
         // Direct port of zero crossing logic from original buildSymbol()
-        if (getVerbosityLevel() >= 5) {
-            std::cout << typeid(*this).name() << ": " << "processZeroCrossing called" << std::endl;
-        }
         bool zero_crossing = (last_sample_ < 0.0 && sample >= 0.0) || (last_sample_ >= 0.0 && sample < 0.0);
 
         if (zero_crossing) {
@@ -158,7 +137,6 @@ namespace flex_next_decoder {
             if (phase_percent > 10.0 && phase_percent < 90.0) {
                 non_consecutive_counter_++;
                 if (non_consecutive_counter_ > 20 && locked_) {
-                    std::cout << "FLEX_NEXT: Synchronisation Lost\n";
                     locked_ = false;
                 }
             } else {
@@ -174,9 +152,6 @@ namespace flex_next_decoder {
         // Combines symbol detection, rate calculation, and lock pattern checking
 
         // Determine the modal symbol (most frequent during symbol period)
-        if (getVerbosityLevel() >= 5) {
-            std::cout << typeid(*this).name() << ": " << "finalizeSymbol called" << std::endl;
-        }
 
         // Reset non-consecutive counter on successful symbol
         non_consecutive_counter_ = 0;
@@ -204,18 +179,12 @@ namespace flex_next_decoder {
 
         // Shift symbols into buffer, symbols are converted so that max and min symbols map to 1
         // (each contains a single 1 bit)
-        if (getVerbosityLevel() >= 5) {
-            std::cout << typeid(*this).name() << ": " << "checkLockPattern called" << std::endl;
-        }
         lock_buffer_ = (lock_buffer_ << 2) | (modal_symbol_ ^ 0x1);
 
         uint64_t lock_pattern = lock_buffer_ ^ LOCK_PATTERN;
         uint64_t lock_mask = (1ULL << (2 * LOCK_LENGTH)) - 1;
 
         if ((lock_pattern & lock_mask) == 0 || ((~lock_pattern) & lock_mask) == 0) {
-            if (getVerbosityLevel() >= 3) {
-                std::cout << "FLEX_NEXT: Locked\n";
-            }
             locked_ = true;
 
             // Clear the synchronisation buffer (from original C code)
@@ -227,7 +196,6 @@ namespace flex_next_decoder {
     void FlexDemodulator::timeout() { //checked and new method added
         timeout_counter_++;
         if (timeout_counter_ > DEMOD_TIMEOUT) {
-            std::cout << "FLEX_NEXT: Timeout\n";
             locked_ = false;
         }
     }

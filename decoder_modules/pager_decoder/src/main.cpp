@@ -26,12 +26,10 @@ class PagerDecoderModule : public ModuleManager::Instance {
 public:
     PagerDecoderModule(std::string name) : name(name) {
         // Initialize decoder types
-        std::cout << "Initializing decoder types" << std::endl;
         decoderTypes.define("POCSAG", DECODER_POCSAG);
         decoderTypes.define("FLEX", DECODER_FLEX);
 
         // Load config
-        std::cout << "Loading config" << std::endl;
         config.acquire();
         if (!config.conf.contains(name)) {
             config.conf[name]["selectedDecoder"] = DECODER_POCSAG;
@@ -154,7 +152,6 @@ private:
     enum DecoderType { DECODER_POCSAG, DECODER_FLEX };
 
     void createDecoder() {
-        std::cout << "Creating decoder" << std::endl;
         if (decoder) {
             decoder->stop();
             delete decoder;
@@ -167,11 +164,9 @@ private:
 
         switch (selectedDecoderId) {
             case DECODER_POCSAG:
-                std::cout << "Creating POCSAG decoder" << std::endl;
                 decoder = new POCSAGDecoder(name, vfo);
                 break;
             case DECODER_FLEX:
-                std::cout << "Creating FLEX decoder" << std::endl;
                 decoder = new FLEXDecoderNext(name, vfo);
                 break;
             default:
@@ -182,7 +177,6 @@ private:
         if (decoder && enabled) {
             decoder->start();
             flog::info("Created and started {} decoder", decoderTypes.key(selectedDecoderId));
-            std::cout << "Created and started " << decoderTypes.key(selectedDecoderId) << " decoder" << std::endl;
         }
     }
 

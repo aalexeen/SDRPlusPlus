@@ -257,9 +257,6 @@ private:
                 return;
             }
 
-            // Console output for testing
-            printf("FLEX: Addr=%ld Type=%d Data=%s\n", address, type, data.c_str());
-
             // Also use flog for SDR++ logging
             flog::info("FLEX Message - Addr: {}, Type: {}, Data: {}", address, type, data);
         }

@@ -10,10 +10,6 @@ namespace flex_next_decoder {
 
     // flex_sync (unrectified version of the symbol)
     uint32_t FlexSynchronizer::processSymbol(uint8_t symbol) { // checked
-        if (getVerbosityLevel() >= 5) {
-            std::cout << typeid(*this).name() << ": "
-                      << "processSymbol called with symbol: " << static_cast<int>(symbol) << std::endl;
-        }
         // ✅ Increment symbol counter
         symbol_count_++;
 
@@ -45,11 +41,6 @@ namespace flex_next_decoder {
         // AAAA = upper 16 bits (codehigh)
         // BBBBBBBB = middle 32 bits (marker)
         // CCCC = lower 16 bits (codelow, inverted)
-        if (getVerbosityLevel() >= 5) {
-            std::cout << typeid(FlexSynchronizer).name() << ": " << "checkSyncPattern called with buffer: " << std::hex
-                      << buffer << std::dec << std::endl;
-        }
-
         uint32_t marker = static_cast<uint32_t>((buffer & MARKER_MASK) >> MARKER_SHIFT);
         uint16_t codehigh = static_cast<uint16_t>((buffer & CODEHIGH_MASK) >> CODEHIGH_SHIFT);
         uint16_t codelow = static_cast<uint16_t>(~(buffer & CODELOW_MASK)); // Invert codelow
@@ -107,21 +98,11 @@ namespace flex_next_decoder {
                 sync_info.baud_rate = mode.baud_rate;
                 sync_info.levels = mode.levels;
 
-                if (verbosity_level_ >= 3) {
-                    std::cout << "FLEX_NEXT: SyncInfoWord: sync_code=0x" << std::hex << sync_code
-                              << " baud=" << std::dec << sync_info.baud_rate << " levels=" << sync_info.levels
-                              << " polarity=" << (sync_info.polarity ? "NEG" : "POS") << std::endl;
-                }
                 return true;
             }
         }
 
         // ✅ Unknown sync code - use default fallback
-        if (verbosity_level_ >= 3) {
-            std::cout << "FLEX_NEXT: Unknown sync code 0x" << std::hex << sync_code << ", defaulting to 1600bps 2FSK"
-                      << std::dec << std::endl;
-        }
-
         // sync_info.baud_rate = 1600;
         // sync_info.levels = 2;
         return false;

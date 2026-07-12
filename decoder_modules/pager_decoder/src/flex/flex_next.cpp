@@ -38,9 +38,6 @@ static void verbprintf(int level, const char* format, ...) {
     vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
 
-    // Keep existing console output
-    printf("FLEX[%d]: %s", level, buffer);
-
     // Add to GUI message storage
     {
         std::lock_guard<std::mutex> lock(flexMessagesMutex);
