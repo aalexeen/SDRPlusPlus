@@ -104,45 +104,22 @@ namespace flex_next_decoder {
         }
     }
 
-    bool FlexMessageDecoder::processFragment(MessageParseResult &result) {
-        if (result.fragment_flag == FragmentFlag::Complete || result.fragment_flag == FragmentFlag::Unknown) {
-            return false; // No fragment processing needed
-        }
-
-        int64_t capcode = 0; // We'd need to get this from the input context
-
-        // For now, we'll use a simple approach - in a real implementation,
-        // we'd need the capcode from the MessageParseInput
-        FragmentBuffer &buffer = fragment_buffers_[capcode];
-
-        if (result.fragment_flag == FragmentFlag::Fragment) {
-            // Start or continue a fragment sequence
-            if (buffer.fragment_count == 0) { buffer.capcode = capcode; }
-            buffer.addFragment(result.content, result.fragment_flag);
-
-            // Don't return the partial content yet
-            result.content = "[Fragment " + std::to_string(buffer.fragment_count) + " buffered]";
-            return true;
-        } else if (result.fragment_flag == FragmentFlag::Continuation) {
-            // Complete the fragment sequence
-            if (buffer.fragment_count > 0 && buffer.capcode == capcode) {
-                buffer.addFragment(result.content, result.fragment_flag);
-
-                // Replace result content with assembled message
-                result.content = buffer.assembled_content;
-                result.fragment_flag = FragmentFlag::Complete;
-
-                // Clear the buffer
-                buffer.reset();
-                fragment_buffers_.erase(capcode);
-
-                return true;
-            } else {
-                // Orphaned continuation - treat as standalone
-                result.error_message += " (Orphaned continuation fragment)";
-            }
-        }
-
+    bool FlexMessageDecoder::processFragment(MessageParseResult & /*result*/) {
+        // STAGE 1 (leak fix): pass fragmented pages through unchanged so each
+        // fragment emits its OWN already-parsed content and keeps its own frag
+        // flag. Real cross-fragment reassembly (frag_find/frag_alloc + FragStore
+        // + K-checksum + dedup, ~247 lines in demod_flex_next.c) is deferred to
+        // Stage 2.
+        //
+        // The old buffering logic here was a broken facade and the source of the
+        // off-air "content/type bleed": it hardcoded capcode = 0, so every
+        // sender's fragments collided into a single buffer, and on a Continuation
+        // it (a) forced the flag to Complete ('K' instead of 'C') and (b)
+        // replaced the message with the mixed accumulation of that shared buffer
+        // — dumping unrelated words (incl. raw hex from a colliding binary page)
+        // into ALN text. Doing nothing here is strictly correct until real
+        // reassembly exists: an unreassembled fragment showing its own clean
+        // text is right; a mis-reassembled one is not.
         return false;
     }
 
